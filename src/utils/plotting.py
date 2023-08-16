@@ -5,7 +5,7 @@ sns.set_context("paper")
 sns.set_theme()
 
 
-def make_condition_barplots(data, flavour="binary"):
+def make_condition_barplots(data, flavour="binary", filename=None, format="svg"):
     fig, axs = plt.subplots(3, 2, sharex=True, sharey=True, figsize=(8, 8))
     for i, vis in enumerate([False, True]):
         df = data[data["own_group_visible"] == vis]
@@ -20,12 +20,12 @@ def make_condition_barplots(data, flavour="binary"):
         barplot(tmp, flavour=flavour, ax=axs[2, i], show_x_label=True, show_y_label=i == 0)
 
     fig.tight_layout()
-    fig.savefig(f"../results/barplots_{flavour}.svg")
+
+    filename = filename or f"barplots_{flavour}"
+    fig.savefig(f"results/{filename}.{format}")
 
 
 def barplot(data, ax, flavour="binary", show_x_label=True, show_y_label=True):
-    print(len(data))
-
     if len(data) == 0:
         return
 
