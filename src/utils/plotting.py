@@ -45,3 +45,40 @@ def barplot(data, ax, flavour="binary", show_x_label=True, show_y_label=True):
     )
     plot.axhline(0.5, ls="--", color="black")
     plot.set(ylim=(0, 1), xlabel=x_label, ylabel=y_label)
+
+
+def scatterplot(data, keys, labels, filename=None, format="svg"):
+    sns.set_style("whitegrid")
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.scatter(data[keys[0]], data[keys[1]], c="blue", marker="o", alpha=0.5)
+    ax.set_xlabel(labels[0])
+    ax.set_ylabel(labels[1])
+
+    filename = filename or "2d_scatter"
+    fig.savefig(f"results/{filename}.{format}")
+
+
+def surfaceplot(data, keys, labels, filename=None, format="svg"):
+    sns.set_style("whitegrid")
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+
+    ax.plot_trisurf(
+        data[keys[0]],
+        data[keys[1]],
+        data[keys[2]],
+        cmap=plt.cm.viridis,
+        linewidth=0.2
+        # data[keys[0]], data[keys[1]], data[keys[2]], c="blue", marker="o", alpha=0.5
+    )
+    ax.set_xlabel(labels[0])
+    ax.set_ylabel(labels[1])
+    ax.set_zlabel(labels[2])
+
+    ax.view_init(20, 225)
+    plt.show()
+
+    # filename = filename or "3d_scatter"
+    # fig.savefig(f"results/{filename}.{format}")
