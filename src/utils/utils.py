@@ -1,6 +1,8 @@
 import os
 import json
 
+import numpy as np
+
 SESSIONS_PATH = "/Users/max/Code/human-gridworlds/data/sessions"
 PENCE_PER_POINT = 1
 
@@ -52,3 +54,10 @@ def generate_bonus_file(sessions, fname):
             amount = ((s["finalScore"] - 150) * PENCE_PER_POINT) / 100
             if amount > 0:
                 f.write(f"{s['context']['PRLFC_ID']},{amount:.2f}\n")
+
+
+def value_similarity(vself, v):
+    sims = 1 - np.abs(vself - v)
+    weights = np.abs(vself - 0.5)
+    weights /= np.sum(weights)
+    return sims, np.sum(sims * weights)

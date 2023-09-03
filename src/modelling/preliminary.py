@@ -52,13 +52,6 @@ def choose(values, beta):
     return np.random.choice(len(values), p=probs)
 
 
-def value_similarity(vself, v):
-    sims = 1 - np.abs(vself - v)
-    weights = np.abs(vself - 0.5)
-    weights /= np.sum(weights)
-    return sims, np.sum(sims * weights)
-
-
 def path_to_item_1d(start, item):
     dest = ITEM_TO_LOC_1D[item]
     if start == dest:

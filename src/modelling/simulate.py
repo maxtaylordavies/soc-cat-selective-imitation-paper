@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from .baselines import indiscriminate, ingroup_bias
+from .weighting_functions.baselines import indiscriminate, ingroup_bias
+from .weighting_functions.explicit_value_functions import explicit_value_funcs
 
 
 def _init_results_dict():
@@ -58,10 +59,14 @@ def simulate_strategy(
     ingroup_strength=1.0,
 ) -> pd.DataFrame:
     df = pd.DataFrame(_init_results_dict())
-    for ogv in [True, False]:
-        for gr in [True, False]:
+    for ogv in [True, False]:  # own group visible
+        for gr in [True, False]:  # groups relevant
             if strategy == "value func inference":
-                raise NotImplementedError
+                weights = explicit_value_funcs(
+                    # agent_categories,
+                    # np.arange(len(agent_categories)),
+                    # agent_categories[own_cat],
+                )
             elif strategy == "latent group inference":
                 raise NotImplementedError
             elif strategy == "ingroup bias" and ogv:

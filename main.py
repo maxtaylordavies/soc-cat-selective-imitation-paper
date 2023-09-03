@@ -12,9 +12,10 @@ from src.utils import (
     make_condition_barplots,
     barplot,
     surfaceplot,
+    value_similarity,
 )
 from src.human import analyse_sessions
-from src.modelling import simulate_strategy, simulate_imitation, value_similarity
+from src.modelling import simulate_strategy, simulate_imitation
 
 
 def run_preliminary_simulations():
