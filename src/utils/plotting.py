@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-sns.set_context("paper")
-sns.set_theme()
+sns.set_theme(context="paper", style="whitegrid")
 
 
 def make_condition_barplots(data, flavour="binary", filename=None, format="svg"):
@@ -47,38 +46,34 @@ def barplot(data, ax, flavour="binary", show_x_label=True, show_y_label=True):
     plot.set(ylim=(0, 1), xlabel=x_label, ylabel=y_label)
 
 
-def scatterplot(data, keys, labels, filename=None, format="svg"):
-    sns.set_style("whitegrid")
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-
-    ax.scatter(data[keys[0]], data[keys[1]], c="blue", marker="o", alpha=0.5)
-    ax.set_xlabel(labels[0])
-    ax.set_ylabel(labels[1])
-
-    filename = filename or "2d_scatter"
-    fig.savefig(f"results/{filename}.{format}")
-
-
-def surfaceplot(data, keys, labels, filename=None, format="svg"):
-    sns.set_style("whitegrid")
-    fig = plt.figure()
+def surfaceplot(
+    data, keys, labels, ticks=None, ticklabels=None, filename="surf", format="svg"
+):
+    fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(111, projection="3d")
 
     ax.plot_trisurf(
-        data[keys[0]],
-        data[keys[1]],
-        data[keys[2]],
-        cmap=plt.cm.viridis,
-        linewidth=0.2
-        # data[keys[0]], data[keys[1]], data[keys[2]], c="blue", marker="o", alpha=0.5
+        data[keys[0]], data[keys[1]], data[keys[2]], cmap=plt.cm.viridis, linewidth=0.2
     )
-    ax.set_xlabel(labels[0])
-    ax.set_ylabel(labels[1])
-    ax.set_zlabel(labels[2])
+    ax.set_xlabel(labels[0], fontsize=14)
+    ax.set_ylabel(labels[1], fontsize=14)
+    ax.set_zlabel(labels[2], fontsize=14)
+    ax.view_init(25, 160)
 
-    ax.view_init(20, 225)
-    plt.show()
+    if ticks:
+        if "x" in ticks:
+            ax.set_xticks(ticks["x"])
+        if "y" in ticks:
+            ax.set_yticks(ticks["y"])
+        if "z" in ticks:
+            ax.set_zticks(ticks["z"])
 
-    # filename = filename or "3d_scatter"
-    # fig.savefig(f"results/{filename}.{format}")
+    if ticklabels:
+        if "x" in ticklabels:
+            ax.set_xticklabels(ticklabels["x"])
+        if "y" in ticklabels:
+            ax.set_yticklabels(ticklabels["y"])
+        if "z" in ticklabels:
+            ax.set_zticklabels(ticklabels["z"])
+
+    fig.savefig(f"{filename}.{format}")
