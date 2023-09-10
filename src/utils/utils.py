@@ -1,10 +1,15 @@
+import datetime
 import os
 import json
 
-import numpy as np
+import jax.numpy as jnp
 
 SESSIONS_PATH = "/Users/max/Code/human-gridworlds/data/sessions"
 PENCE_PER_POINT = 1
+
+
+def log(msg):
+    print(f"[{datetime.datetime.now()}] {msg}")
 
 
 def load_json(fp):
@@ -56,8 +61,16 @@ def generate_bonus_file(sessions, fname):
                 f.write(f"{s['context']['PRLFC_ID']},{amount:.2f}\n")
 
 
+# normalise array have sum 1
+def norm_unit_sum(x: jnp.ndarray):
+    if x.sum() == 0:
+        return jnp.ones_like(x) / len(x)
+    return x / x.sum()
+
+
 def value_similarity(vself, v):
-    sims = 1 - np.abs(vself - v)
-    weights = np.abs(vself - 0.5)
-    weights /= np.sum(weights)
-    return sims, np.sum(sims * weights)
+    sims = 1 - jnp.abs(vself - v)
+    weights = jnp.abs(vself - 0.5)
+    if jnp.sum(weights) == 0:
+        return 0
+    return jnp.sum(sims * norm_unit_sum(weights))

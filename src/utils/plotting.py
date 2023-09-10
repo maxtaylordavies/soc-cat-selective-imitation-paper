@@ -1,7 +1,16 @@
+import matplotlib.pylab as pylab
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-sns.set_theme(context="paper", style="whitegrid")
+sns.set_theme(context="paper", style="darkgrid")
+pylab.rcParams.update(
+    {
+        "axes.labelsize": "large",
+        "axes.titlesize": "large",
+        # "xtick.labelsize": "x-large",
+        # "ytick.labelsize": "x-large",
+    }
+)
 
 
 def make_condition_barplots(data, flavour="binary", filename=None, format="svg"):
@@ -77,3 +86,185 @@ def surfaceplot(
             ax.set_zticklabels(ticklabels["z"])
 
     fig.savefig(f"{filename}.{format}")
+
+
+def plot_model_effectiveness(data, weights, phis, vselfs, filename, use_2d=False):
+    if use_2d:
+        plot_model_effectiveness_2d(data, weights, phis, vselfs, filename)
+    else:
+        plot_model_effectiveness_1d(data, weights, phis, vselfs, filename)
+
+
+def plot_model_effectiveness_1d(data, weights, phis, vselfs, filename):
+    fig, axs = plt.subplots(3, len(vselfs), figsize=(12, 8), sharex=False, sharey="row")
+    palette = sns.color_palette("viridis", n_colors=len(phis))
+
+    for i, vself in enumerate(vselfs):
+        df = data[data["vself"] == i]
+
+        # plot histogram of value functions
+        sns.histplot(
+            data=df,
+            stat="probability",
+            x="v",
+            hue="phi",
+            bins=20,
+            alpha=0.5,
+            zorder=1,
+            kde=True,
+            line_kws={
+                "linewidth": 2.5,
+                "alpha": 1.0,
+            },
+            legend=False,
+            ax=axs[0, i],
+            palette=palette,
+        )
+        axs[0, i].set(
+            xlabel="$\mathbf{v}$",
+            ylabel="$p(\mathbf{v}|\phi)$",
+            title=f"$\mathbf{{v}}^{{(self)}}={vself[0]}$",
+        )
+
+        # plot imitation rewards
+        sns.stripplot(
+            data=df,
+            x="phi",
+            y="reward",
+            hue="phi",
+            dodge=True,
+            alpha=0.2,
+            zorder=1,
+            legend=False,
+            ax=axs[1, i],
+            palette=palette,
+        )
+        sns.pointplot(
+            data=df,
+            x="phi",
+            y="reward",
+            hue="phi",
+            join=False,
+            dodge=0.8 - 0.8 / 3,
+            # markers="d",
+            scale=1.25,
+            errorbar=None,
+            ax=axs[1, i],
+            palette=palette,
+        )
+        ylabel = "Imitation reward" if i == 0 else None
+        axs[1, i].set(xlabel=None, xticks=[], xticklabels=[], ylabel=ylabel)
+        axs[1, i].legend([], [], frameon=False)
+
+        # plot computed weights
+        sns.barplot(
+            x=phis,
+            y=weights[i],
+            ax=axs[2, i],
+            palette=palette,
+        )
+        ylabel = "Weight" if i == 0 else None
+        axs[2, i].set(ylim=(0, 1), xlabel="$\phi$", ylabel=ylabel)
+
+    fig.suptitle("Using known value functions", fontsize=16)
+    fig.tight_layout()
+
+    plt.show()
+    fig.savefig(filename)
+
+
+def plot_model_effectiveness_2d(data, weights, phis, vselfs, filename):
+    fig, axs = plt.subplots(3, len(vselfs), figsize=(12, 8), sharex=False, sharey="row")
+    palette = sns.color_palette("viridis", n_colors=len(phis))
+
+    for i, vself in enumerate(vselfs):
+        df = data[data["vself"] == i]
+
+        # plot histogram of value functions
+        sns.histplot(
+            data=df,
+            stat="probability",
+            x="vx",
+            y="vy",
+            hue="phi",
+            alpha=0.4,
+            bins=30,
+            zorder=1,
+            legend=False,
+            ax=axs[0, i],
+            palette=palette,
+        )
+        sns.kdeplot(
+            data=df,
+            stat="probability",
+            x="vx",
+            y="vy",
+            hue="phi",
+            alpha=0.7,
+            zorder=2,
+            levels=5,
+            legend=False,
+            ax=axs[0, i],
+            palette=palette,
+        )
+        axs[0, i].set(
+            xlabel="$\mathbf{v}_x$",
+            ylabel="$\mathbf{v}_y$",
+            title=f"$\mathbf{{v}}^{{(self)}}=[{vself[0]},{vself[1]}]$",
+        )
+
+        # add red x at vself
+        axs[0, i].scatter(
+            vself[0],
+            vself[1],
+            marker="x",
+            color="red",
+            s=100,
+            linewidth=2.5,
+            zorder=3,
+        )
+
+        # plot imitation rewards
+        sns.stripplot(
+            data=df,
+            x="phi",
+            y="reward",
+            hue="phi",
+            dodge=True,
+            alpha=0.2,
+            zorder=1,
+            legend=False,
+            ax=axs[1, i],
+            palette=palette,
+        )
+        sns.pointplot(
+            data=df,
+            x="phi",
+            y="reward",
+            hue="phi",
+            join=False,
+            dodge=0.8 - 0.8 / 3,
+            scale=1.25,
+            errorbar=None,
+            ax=axs[1, i],
+            palette=palette,
+        )
+        ylabel = "Imitation reward" if i == 0 else None
+        axs[1, i].set(xlabel=None, xticks=[], xticklabels=[], ylabel=ylabel)
+        axs[1, i].legend([], [], frameon=False)
+
+        # plot computed weights
+        sns.barplot(
+            x=phis,
+            y=weights[i],
+            ax=axs[2, i],
+            palette=palette,
+        )
+        ylabel = "Weight" if i == 0 else None
+        axs[2, i].set(ylim=(0, 1), xlabel="$\phi$", ylabel=ylabel)
+
+    fig.suptitle("Using known value functions", fontsize=16)
+    fig.tight_layout()
+
+    plt.show()
+    # fig.savefig(filename)

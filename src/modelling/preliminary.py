@@ -200,7 +200,7 @@ def visualise_trajectory_2d(traj):
     return grid
 
 
-def simulate_imitation_1d(vm, vself, c, beta, trials, level):
+def simulate_imitation_1d(vself, vm, c, beta, trials, level):
     vself_ = item_values_1d(v=vself[0])
     vm_ = item_values_1d(v=vm[0])
     V = compute_state_values_1d(vm_, c)
@@ -216,7 +216,7 @@ def simulate_imitation_1d(vm, vself, c, beta, trials, level):
     return np.mean(rewards), np.mean(proportions)
 
 
-def simulate_imitation_2d(vm, vself, c, beta, trials, level):
+def simulate_imitation_2d(vself, vm, c, beta, trials, level):
     vself_ = item_values_2d(vx=vself[0], vy=vself[1])
     vm_ = item_values_2d(vx=vm[0], vy=vm[1])
     V = compute_state_values_2d(vm_, c)
@@ -232,7 +232,7 @@ def simulate_imitation_2d(vm, vself, c, beta, trials, level):
     return np.mean(rewards), np.mean(proportions)
 
 
-def simulate_imitation(vm, vself, c=0.1, beta=0.01, trials=10000, level="traj"):
+def simulate_imitation(vself, vm, c=0.1, beta=0.01, trials=10000, level="traj"):
     if len(vm) == 1:
         return simulate_imitation_1d(vm, vself, c, beta, trials, level)
     elif len(vm) == 2:

@@ -1,3 +1,3 @@
-from .simulate import *
-from .approaches.baselines import *
+from .model_humanlikeness import *
+from .model_effectiveness import *
 from .preliminary import *

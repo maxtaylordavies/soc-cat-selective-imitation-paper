@@ -1,8 +1,8 @@
 import os
 
-import numpy as np
+from jax import random
+import jax.numpy as jnp
 import pandas as pd
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from src.utils import (
@@ -10,12 +10,15 @@ from src.utils import (
     save_responses,
     generate_bonus_file,
     make_condition_barplots,
-    barplot,
+    plot_model_effectiveness,
     surfaceplot,
     value_similarity,
 )
 from src.human import analyse_sessions
-from src.modelling import simulate_strategy, simulate_imitation
+from src.modelling import simulate_strategy, simulate_imitation, analyse_model_effectiveness
+
+
+rng_key = random.PRNGKey(0)
 
 
 def run_preliminary_simulations():
@@ -27,19 +30,19 @@ def run_preliminary_simulations():
             for level in data["level"].unique():
                 d = data[data["level"] == level]
 
-                surfaceplot(
-                    d[d["beta"] == np.log10(betas[0])],
-                    ["sim_x", "sim_y", "reward"],
-                    ["Value similarity (x)", "Value similarity (y)", "Average reward"],
-                    filename=f"results/{folder}/surface_{level}_sim",
-                    format=fmt,
-                )
+                # surfaceplot(
+                #     d[d["beta"] == jnp.log10(betas[0])],
+                #     ["sim_x", "sim_y", "reward"],
+                #     ["Value similarity (x)", "Value similarity (y)", "Average reward"],
+                #     filename=f"results/{folder}/surface_{level}_sim",
+                #     format=fmt,
+                # )
 
                 surfaceplot(
                     d,
                     ["sim", "beta", "reward"],
                     ["Value similarity (combined)", "Decision noise", "Average reward"],
-                    ticks={"y": [np.log10(b) for b in betas]},
+                    ticks={"y": [jnp.log10(b) for b in betas]},
                     ticklabels={"y": [str(b) for b in betas]},
                     filename=f"results/{folder}/surface_{level}_beta",
                     format=fmt,
@@ -58,79 +61,90 @@ def run_preliminary_simulations():
     trials = 1000
 
     # 1-dimensional case
-    vself = np.array([1])
+    vself = jnp.array([1])
 
     data = {"sim": [], "beta": [], "competence": [], "reward": [], "level": []}
-    for vm in tqdm([np.array([v]) for v in np.linspace(0, 1, 11)]):
+    for vm in tqdm([jnp.array([v]) for v in jnp.linspace(0, 1, 11)]):
         for beta in betas:
-            for level in ["traj", "step"]:
+            for level in ["traj"]:
                 reward, proportion = simulate_imitation(
-                    vm, vself, c, beta, level=level, trials=trials
+                    vself, vm, c, beta, level=level, trials=trials
                 )
                 data["reward"].append(reward)
                 data["competence"].append(proportion)
-                data["sim"].append(value_similarity(vm, vself))
-                data["beta"].append(np.log10(beta))
+                data["sim"].append(value_similarity(vself, vm))
+                data["beta"].append(jnp.log10(beta))
                 data["level"].append(level)
 
     data = pd.DataFrame(data)
     make_surface_plots(data, betas, "1d")
 
-    # 2-dimensional case
+    # # 2-dimensional case
 
-    data = {
-        "sim_x": [],
-        "sim_y": [],
-        "sim": [],
-        "beta": [],
-        "competence": [],
-        "reward": [],
-        "level": [],
-        "vself_idx": [],
-    }
+    # data = {
+    #     "sim_x": [],
+    #     "sim_y": [],
+    #     "sim": [],
+    #     "beta": [],
+    #     "competence": [],
+    #     "reward": [],
+    #     "level": [],
+    #     "vself_idx": [],
+    # }
 
-    vselfs = [
-        np.array([0, 1]),
-        np.array([1, 0]),
-        np.array([1, 0.5]),
-        np.array([0.5, 1]),
-    ]
+    # vselfs = [
+    #     jnp.array([0, 1]),
+    #     jnp.array([1, 0]),
+    #     jnp.array([1, 0.5]),
+    #     jnp.array([0.5, 1]),
+    # ]
 
-    for i, vself in enumerate(vselfs):
-        for vx in tqdm(np.linspace(0, 1, 11)):
-            for vy in np.linspace(0, 1, 11):
-                vm = np.array([vx, vy])
-                for beta in betas:
-                    for level in ["traj", "step"]:
-                        reward, proportion = simulate_imitation(
-                            vm, vself, c, beta, level=level, trials=trials
-                        )
-                        sims, combined = value_similarity(vself, vm)
-                        data["sim_x"].append(sims[0])
-                        data["sim_y"].append(sims[1])
-                        data["sim"].append(combined)
-                        data["reward"].append(reward)
-                        data["beta"].append(np.log10(beta))
-                        data["competence"].append(proportion)
-                        data["level"].append(level)
-                        data["vself_idx"].append(i)
+    # for i, vself in enumerate(vselfs):
+    #     for vx in tqdm(jnp.linspace(0, 1, 11)):
+    #         for vy in jnp.linspace(0, 1, 11):
+    #             vm = jnp.array([vx, vy])
+    #             for beta in betas:
+    #                 for level in ["traj", "step"]:
+    #                     reward, proportion = simulate_imitation(
+    #                         vself, vm, c, beta, level=level, trials=trials
+    #                     )
+    #                     sims, combined = value_similarity(vself, vm)
+    #                     data["sim_x"].append(sims[0])
+    #                     data["sim_y"].append(sims[1])
+    #                     data["sim"].append(combined)
+    #                     data["reward"].append(reward)
+    #                     data["beta"].append(jnp.log10(beta))
+    #                     data["competence"].append(proportion)
+    #                     data["level"].append(level)
+    #                     data["vself_idx"].append(i)
 
-    data = pd.DataFrame(data)
+    # data = pd.DataFrame(data)
 
-    for i, vself in enumerate(vselfs):
-        d = data[data["vself_idx"] == i]
-        make_surface_plots(d, betas, f"2d/step/{i}")
+    # for i, vself in enumerate(vselfs):
+    #     d = data[data["vself_idx"] == i]
+    #     make_surface_plots(d, betas, f"2d/step/{i}")
 
-    for fmt in ["svg", "pdf"]:
-        surfaceplot(
-            d,
-            ["sim", "beta", "reward"],
-            ["Value similarity (combined)", "Decision noise", "Average reward"],
-            ticks={"y": [np.log10(b) for b in betas]},
-            ticklabels={"y": [str(b) for b in betas]},
-            filename=f"results/2d/surface_{level}_beta",
-            format=fmt,
-        )
+    # for fmt in ["svg", "pdf"]:
+    #     surfaceplot(
+    #         d,
+    #         ["sim", "beta", "reward"],
+    #         ["Value similarity (combined)", "Decision noise", "Average reward"],
+    #         ticks={"y": [jnp.log10(b) for b in betas]},
+    #         ticklabels={"y": [str(b) for b in betas]},
+    #         filename=f"results/2d/surface_{level}_beta",
+    #         format=fmt,
+    #     )
+
+
+def run_model_analysis():
+    model_name = "value_functions_known"
+    use_2d = False
+    data, weights, phis, vselfs = analyse_model_effectiveness(
+        rng_key, model_name, use_2d=use_2d, agents_per_phi=25, sigma=0.01, beta=0.05
+    )
+    plot_model_effectiveness(
+        data, weights, phis, vselfs, f"results/{model_name}.pdf", use_2d=use_2d
+    )
 
 
 def run_human_data_analysis():
@@ -155,10 +169,10 @@ def run_human_data_analysis():
     make_condition_barplots(data, flavour=flavour)
 
 
-def run_model_analysis():
+def run_human_model_comparison():
     for strategy in ["indiscriminate", "ingroup bias"]:
         results = simulate_strategy(
-            agent_categories=np.array([0, 1]),
+            agent_categories=jnp.array([0, 1]),
             strategy=strategy,
             beta=1,
             repeats=1000,
@@ -170,8 +184,9 @@ def run_model_analysis():
 
 def main():
     # run_preliminary_simulations()
-    # run_human_data_analysis()
     run_model_analysis()
+    # run_human_data_analysis()
+    # run_human_model_comparison()
 
 
 if __name__ == "__main__":

@@ -4,6 +4,12 @@ import numpy as np
 from scipy.special import gamma
 
 
+def clipped_gaussian(mus, stds, num=1):
+    cov = np.diag(stds**2)
+    samples = np.random.default_rng().multivariate_normal(mus, cov, num)
+    return np.clip(samples, 0, 1)
+
+
 def boltzmann1d(r, beta):
     p = np.exp(r / beta)
     return p / np.sum(p)
