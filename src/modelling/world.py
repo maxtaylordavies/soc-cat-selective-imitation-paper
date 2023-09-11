@@ -1,99 +1,134 @@
-import numpy as np
+from jax import random
+import jax.numpy as jnp
+
+from src.modelling.distributions import boltzmann1d
 
 
-class Gridworld:
-    def __init__(self, width, height, goals, move_cost=0, gamma=0.9):
-        super().__init__()
-        self.width = width
-        self.height = height
-        self.move_cost = move_cost
-        self.gamma = gamma
+LENGTH = 11
+ITEMS_1D = ("A", "B")
+ITEM_TO_LOC_1D = {"A": 0, "B": LENGTH - 1}
+LOC_TO_ITEM_1D = {v: k for k, v in ITEM_TO_LOC_1D.items()}
+ITEMS_2D = ("A", "B", "C", "D")
+ITEM_TO_LOC_2D = {
+    "A": (0, 0),
+    "B": (0, LENGTH - 1),
+    "C": (LENGTH - 1, 0),
+    "D": (LENGTH - 1, LENGTH - 1),
+}
+LOC_TO_ITEM_2D = {v: k for k, v in ITEM_TO_LOC_2D.items()}
 
-        self.state_dim, self.action_dim = self.height * self.width, 4
 
-        self._reward_map = {self.state_to_idx(s): 0 for s in goals}
-        self._action_map = {
-            0: np.array([0, -1]),  # left
-            1: np.array([-1, 0]),  # up
-            2: np.array([0, 1]),  # right
-            3: np.array([1, 0]),  # down
-        }
+def item_values_1d(v):
+    return {
+        "A": v,
+        "B": 1 - v,
+    }
 
-        self._create_transition_matrix()
 
-    def _create_transition_matrix(self):
-        self.P = np.zeros((self.state_dim, self.action_dim, self.state_dim))
+def item_values_2d(vx, vy):
+    return {
+        "A": vy * (1 - vx),  # top left
+        "B": vy * vx,  # top right
+        "C": (1 - vy) * (1 - vx),  # bottom left
+        "D": (1 - vy) * vx,  # bottom right
+    }
 
-        for row in range(self.height):
-            for col in range(self.width):
-                s = np.array([row, col])
 
-                for a in self._action_map.keys():
-                    s_next = s + self._action_map[a]
+def random_locs_1d(rng_key, n):
+    return random.randint(rng_key, (n,), 1, LENGTH - 1)
 
-                    if not self._is_in_grid(s_next):
-                        s_next = s
 
-                    self.P[self.state_to_idx(s), a, self.state_to_idx(s_next)] = 1.0
+def random_locs_2d(rng_key, n):
+    all_locs = [
+        (r, c) for r in range(LENGTH) for c in range(LENGTH) if (r, c) not in LOC_TO_ITEM_1D
+    ]
+    indices = random.choice(rng_key, len(all_locs), shape=(n,), replace=True)
+    return [all_locs[i] for i in indices]
 
-    def _create_reward_matrix(self):
-        self.R = np.zeros((self.state_dim, self.action_dim, self.state_dim))
 
-        for row in range(self.height):
-            for col in range(self.width):
-                s = np.array([row, col])
+def choose(rng_key, values, beta):
+    probs = boltzmann1d(values, beta)
+    return random.choice(rng_key, len(values), p=probs)
 
-                for a in self._action_map.keys():
-                    s_next = s + self._action_map[a]
 
-                    if not self._is_in_grid(s_next):
-                        s_next = s
+def path_to_item_1d(start, item):
+    dest = ITEM_TO_LOC_1D[item]
+    if start == dest:
+        return [start]
+    elif start < dest:
+        return list(range(start, dest + 1))
+    else:
+        return list(range(start, dest - 1, -1))
 
-                    self.R[
-                        self.state_to_idx(s), a, self.state_to_idx(s_next)
-                    ] = self._get_reward(s_next)
 
-    def _is_in_grid(self, s):
-        return 0 <= s[0] < self.height and 0 <= s[1] < self.width
+def path_to_item_2d(start, item):
+    def l_path(start, dest):
+        sr, sc = start
+        dr, dc = dest
 
-    def _get_reward(self, s):
-        return self._reward_map.get(self.state_to_idx(s), 0) - self.move_cost
+        if dr < sr:
+            return [start] + l_path((sr - 1, sc), dest)
+        elif dr > sr:
+            return [start] + l_path((sr + 1, sc), dest)
+        elif dc < sc:
+            return [start] + l_path((sr, sc - 1), dest)
+        elif dc > sc:
+            return [start] + l_path((sr, sc + 1), dest)
+        else:
+            return [start]
 
-    def state_to_idx(self, s):
-        return s[0] * self.width + s[1]
+    dest = ITEM_TO_LOC_2D[item]
+    return l_path(start, dest)
 
-    def idx_to_state(self, idx):
-        return np.array([idx // self.width, idx % self.width])
 
-    def is_terminal(self, s):
-        return self.state_to_idx(s) in self._reward_map
+def traj_reward_1d(traj, v, c):
+    return traj_reward(traj, v, c, LOC_TO_ITEM_1D)
 
-    def act(self, s, a):
-        if self.is_terminal(s):
-            return s, True
 
-        s_next = s + self._action_map[a]
-        if not self._is_in_grid(s_next):
-            s_next = s
+def traj_reward_2d(traj, v, c):
+    return traj_reward(traj, v, c, LOC_TO_ITEM_2D)
 
-        return s_next, self._get_reward(s_next), self.is_terminal(s_next)
 
-    def set_rewards(self, rewards):
-        self._reward_map = {s: r for (s, r) in zip(self._reward_map.keys(), rewards)}
-        self._create_reward_matrix()
+def traj_reward(traj, v, c, map):
+    r = 0
+    for s in traj:
+        r += v[map[s]] if s in map else -c
+    return r
 
-    def solve_q_values(self, theta=0.0001):
-        Q, delta = np.zeros((self.state_dim, self.action_dim)), np.inf
-        while delta >= theta:
-            q = Q.copy()
-            Q = (self.P * (self.R + (self.gamma * q.max(axis=1)))).sum(axis=2)
-            delta = abs(q - Q).max()
-        return Q
 
-    @classmethod
-    def random(cls, width, height, num_goals, move_cost=0, gamma=0.9):
-        goals = [
-            np.array([np.random.randint(height), np.random.randint(width)])
-            for _ in range(num_goals)
-        ]
-        return cls(width, height, goals, move_cost, gamma)
+def square_value_1d(v, x, c):
+    def item_val(item):
+        dest = ITEM_TO_LOC_1D[item]
+        return v[item] - c * jnp.abs(x - dest)
+
+    vals = jnp.array([item_val(item) for item in v.keys()])
+    return jnp.max(vals)
+
+
+def square_value_2d(v, square, c):
+    def item_val(item):
+        dest = ITEM_TO_LOC_2D[item]
+        distance = jnp.abs(square[0] - dest[0]) + jnp.abs(square[1] - dest[1])
+        return v[item] - c * distance
+
+    vals = jnp.array([item_val(item) for item in v.keys()])
+    return jnp.max(jnp.array(vals))
+
+
+def compute_state_values_1d(v, c):
+    return jnp.array([square_value_1d(v, x, c) for x in range(LENGTH)])
+    # V = jnp.zeros(LENGTH)
+    # for i in range(LENGTH):
+    #     V[i] = square_value_1d(v, i, c)
+    # return V
+
+
+def compute_state_values_2d(v, c):
+    return jnp.array(
+        [[square_value_2d(v, (i, j), c) for j in range(LENGTH)] for i in range(LENGTH)]
+    )
+    # V = jnp.zeros((LENGTH, LENGTH))
+    # for i in range(LENGTH):
+    #     for j in range(LENGTH):
+    #         V[i, j] = square_value_2d(v, (i, j), c)
+    # return V

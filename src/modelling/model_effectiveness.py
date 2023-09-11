@@ -4,12 +4,12 @@ from tqdm import tqdm
 import pandas as pd
 
 from .preliminary import simulate_imitation
-from .weighting_functions.explicit_value_functions import explicit_value_funcs
+from .weighting_functions.explicit_value_functions import value_funcs_known
 
 
 def analyse_model_effectiveness(rng_key, model_name, use_2d=False, **kwargs):
     if model_name == "value_functions_known":
-        compute_weights = explicit_value_funcs
+        compute_weights = value_funcs_known
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -52,9 +52,7 @@ def analyse_model_effectiveness_2d(
             imitation_results["vself"].append(i)
 
         # compute weights
-        weights.append(
-            compute_weights(agents, phis, vself, type="fit_distribution", rng_key=rng_key)
-        )
+        weights.append(compute_weights(rng_key, agents, phis, vself))
 
     return pd.DataFrame(imitation_results), weights, phis, vselfs
 

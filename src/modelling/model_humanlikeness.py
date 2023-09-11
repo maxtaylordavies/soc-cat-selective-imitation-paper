@@ -3,7 +3,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from .weighting_functions.baselines import indiscriminate, ingroup_bias
-from .weighting_functions.explicit_value_functions import explicit_value_funcs
+from .weighting_functions.explicit_value_functions import value_funcs_known
 
 
 def _init_results_dict():
@@ -62,7 +62,7 @@ def simulate_strategy(
     for ogv in [True, False]:  # own group visible
         for gr in [True, False]:  # groups relevant
             if strategy == "value func inference":
-                weights = explicit_value_funcs(
+                weights = value_funcs_known(
                     # agent_categories,
                     # np.arange(len(agent_categories)),
                     # agent_categories[own_cat],
