@@ -1,7 +1,7 @@
 from jax import random
 import jax.numpy as jnp
 
-from src.modelling.distributions import boltzmann1d
+from src.modelling.probabilistic import boltzmann1d
 
 
 LENGTH = 11

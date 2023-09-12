@@ -20,6 +20,30 @@ from .world import (
 MAX_STEPS = 50
 
 
+def simulate_trajectories(rng_key, v, c, beta, N):
+    if len(v) == 1:
+        return simulate_trajectories_1d(rng_key, v, c, beta, N)
+    elif len(v) == 2:
+        return simulate_trajectories_2d(rng_key, v, c, beta, N)
+    raise Exception(f"got unsupported number of dimensions {len(v)}")
+
+
+def simulate_trajectories_1d(rng_key, v, c, beta, N):
+    trajs = []
+    v_ = item_values_1d(v[0])
+    for start in random_locs_1d(rng_key, N):
+        trajs.append(simulate_trajectory_1d(rng_key, v_, start, c, beta))
+    return trajs
+
+
+def simulate_trajectories_2d(rng_key, v, c, beta, N):
+    trajs = []
+    v_ = item_values_2d(v[0], v[1])
+    for start in random_locs_2d(rng_key, N):
+        trajs.append(simulate_trajectory_2d(rng_key, v_, start, c, beta))
+    return trajs
+
+
 def simulate_trajectory_1d(rng_key, v, start, c, beta, level="traj", V=None):
     # make choice at trajectory level
     if level == "traj":
