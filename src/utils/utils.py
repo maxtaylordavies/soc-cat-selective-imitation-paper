@@ -74,3 +74,21 @@ def value_similarity(vself, v):
     if jnp.sum(weights) == 0:
         return 0
     return jnp.sum(sims * norm_unit_sum(weights))
+
+
+def mean_pool_1d(x: jnp.ndarray, pool_size: int):
+    if pool_size == 1:
+        return x
+
+    tmp = jnp.mean(x.reshape(-1, pool_size), axis=1)
+    return jnp.repeat(tmp, pool_size)
+
+
+def mean_pool_2d(x: jnp.ndarray, pool_size: int):
+    if pool_size == 1:
+        return x
+
+    r, c = x.shape
+    r, c = r // pool_size, c // pool_size
+    tmp = jnp.mean(x.reshape(r, pool_size, c, pool_size), axis=(1, 3))
+    return jnp.repeat(jnp.repeat(tmp, pool_size, axis=0), pool_size, axis=1)

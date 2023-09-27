@@ -12,9 +12,9 @@ from .weighting_functions.explicit_value_functions import (
 
 
 MODELS = {
-    "value_functions_known": value_funcs_known,
-    "value_functions_inferred_individual": value_funcs_inferred_individual,
-    "value_functions_inferred_group": value_funcs_inferred_group,
+    "value functions known": value_funcs_known,
+    "value functions inferred (individual)": value_funcs_inferred_individual,
+    "value functions inferred (group)": value_funcs_inferred_group,
 }
 
 
@@ -83,7 +83,7 @@ def analyse_model_effectiveness_1d(
     phis = list(range(num_phis))
     mus = [jnp.array([mu]) for mu in jnp.linspace(0.1, 0.9, num_phis)]
     cov = jnp.array([[sigma]])
-    vselfs = [jnp.array([0.0]), jnp.array([1.0])]
+    vselfs = [jnp.array([0.0]), jnp.array([0.5]), jnp.array([1.0])]
 
     agents = _sample_agents(
         rng_key, phis, mus, cov, agents_per_phi, beta=beta, c=c, num_traj=num_traj
@@ -110,11 +110,8 @@ def analyse_model_effectiveness_1d(
 def _sample_agents(rng_key, phis, mus, cov, agents_per_phi, beta=0.01, c=0.1, num_traj=0):
     agents = []
 
-    for phi in phis:
-        value_funcs = dist.MultivariateNormal(mus[phi], cov).sample(
-            rng_key, (agents_per_phi,)
-        )
-        for v in tqdm(value_funcs, desc=f"sampling agents for phi={phi}"):
+    for phi in tqdm(phis, desc="sampling agents"):
+        for v in dist.MultivariateNormal(mus[phi], cov).sample(rng_key, (agents_per_phi,)):
             trajs = simulate_trajectories(rng_key, v, c=c, beta=beta, N=num_traj)
             agents.append({"phi": phi, "v": v, "trajs": trajs})
 

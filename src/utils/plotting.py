@@ -1,6 +1,7 @@
 import matplotlib.pylab as pylab
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
 
 sns.set_theme(context="paper", style="darkgrid")
 pylab.rcParams.update(
@@ -88,11 +89,11 @@ def surfaceplot(
     fig.savefig(f"{filename}.{format}")
 
 
-def plot_model_effectiveness(data, weights, phis, vselfs, filename, use_2d=False):
+def plot_model_effectiveness(data, weights, phis, vselfs, model_name, filename, use_2d=False):
     if use_2d:
-        plot_model_effectiveness_2d(data, weights, phis, vselfs, filename)
+        plot_model_effectiveness_2d(data, weights, phis, vselfs, model_name, filename)
     else:
-        plot_model_effectiveness_1d(data, weights, phis, vselfs, filename)
+        plot_model_effectiveness_1d(data, weights, phis, vselfs, model_name, filename)
 
 
 def plot_model_effectiveness_1d(data, weights, phis, vselfs, filename):
@@ -156,24 +157,43 @@ def plot_model_effectiveness_1d(data, weights, phis, vselfs, filename):
         axs[1, i].set(xlabel=None, xticks=[], xticklabels=[], ylabel=ylabel)
         axs[1, i].legend([], [], frameon=False)
 
-        # plot computed weights
-        sns.barplot(
-            x=phis,
-            y=weights[i],
+        tmp = [
+            {"model": k, "phi": phis[j], "w": float(v[i][j])}
+            for k, v in weights.items()
+            for j in range(len(phis))
+        ]
+        weights_df = pd.DataFrame(tmp)
+
+        sns.lineplot(
+            data=weights_df,
+            x="phi",
+            y="w",
+            style="model",
+            markers=True,
             ax=axs[2, i],
             palette=palette,
+            legend=i == len(vselfs) - 1,
         )
+
+        # plot computed weights
+        # sns.barplot(
+        #     x=phis,
+        #     y=weights[i],
+        #     ax=axs[2, i],
+        #     palette=palette,
+        # )
+
         ylabel = "Weight" if i == 0 else None
         axs[2, i].set(ylim=(0, 1), xlabel="$\phi$", ylabel=ylabel)
 
-    fig.suptitle("Using known value functions", fontsize=16)
+    fig.suptitle("Comparison of approaches in 1D gridworld", fontsize=16)
     fig.tight_layout()
 
     plt.show()
     fig.savefig(filename)
 
 
-def plot_model_effectiveness_2d(data, weights, phis, vselfs, filename):
+def plot_model_effectiveness_2d(data, weights, phis, vselfs, model_name, filename):
     fig, axs = plt.subplots(3, len(vselfs), figsize=(12, 8), sharex=False, sharey="row")
     palette = sns.color_palette("viridis", n_colors=len(phis))
 
@@ -263,7 +283,7 @@ def plot_model_effectiveness_2d(data, weights, phis, vselfs, filename):
         ylabel = "Weight" if i == 0 else None
         axs[2, i].set(ylim=(0, 1), xlabel="$\phi$", ylabel=ylabel)
 
-    fig.suptitle("Using known value functions", fontsize=16)
+    fig.suptitle(model_name, fontsize=16)
     fig.tight_layout()
 
     plt.show()

@@ -1,0 +1,9 @@
+name: modelling
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - scipy
+  - scikit-learn
+prefix: /opt/miniconda3/envs/modelling

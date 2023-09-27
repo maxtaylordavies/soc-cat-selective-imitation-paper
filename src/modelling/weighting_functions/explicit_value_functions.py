@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 from src.utils.utils import value_similarity, log, norm_unit_sum
 from src.modelling.probabilistic import multivariate_gaussian_model, posterior_predictive
-from src.modelling.world import traj_reward_1d, item_values_1d
+from src.modelling.worlds.item_gridworld import traj_reward_1d, item_values_1d
 
 
 def value_funcs_known(rng_key, agents, cat_phis, vself):

@@ -1,6 +1,6 @@
 import numpy as np
 
-from .world import (
+from .worlds.item_gridworld import (
     LENGTH,
     LOC_TO_ITEM_1D,
     LOC_TO_ITEM_2D,

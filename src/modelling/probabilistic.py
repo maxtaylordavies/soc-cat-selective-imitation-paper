@@ -14,14 +14,14 @@ def clipped_gaussian(mus, stds, num=1):
     return np.clip(samples, 0, 1)
 
 
-def boltzmann1d(r, beta):
-    p = np.exp(r / beta)
-    return p / np.sum(p)
+def boltzmann1d(x, beta):
+    p = jnp.exp(x / beta)
+    return p / jnp.sum(p)
 
 
-def boltzmann2d(r, beta):
-    p = np.exp(r / beta)
-    return p / np.sum(p, axis=1).reshape((-1, 1))
+def boltzmann2d(x, beta):
+    p = jnp.exp(x / beta)
+    return p / jnp.sum(p, axis=1).reshape((-1, 1))
 
 
 def crp(z, c, log=True):
@@ -29,17 +29,17 @@ def crp(z, c, log=True):
     coeff = ((c ** len(counts)) * gamma(c)) / gamma(c + len(z))
 
     if log:
-        return coeff + np.sum([gamma(counts[k]) for k in counts])
+        return coeff + jnp.sum([gamma(counts[k]) for k in counts])
 
-    return coeff * np.prod([gamma(counts[k]) for k in counts])
+    return coeff * jnp.prod([gamma(counts[k]) for k in counts])
 
 
 def dirichlet_multinomial(counts, T, L, g, log=True):
     coeff = (gamma(L * g) * gamma(T + 1)) / gamma(T + (L * g))
-    prods = np.prod(gamma(counts + g) / (gamma(g) * gamma(counts + 1)), axis=1)
+    prods = jnp.prod(gamma(counts + g) / (gamma(g) * gamma(counts + 1)), axis=1)
 
     tmp = coeff * prods
-    return np.sum(np.log(tmp)) if log else np.prod(tmp)
+    return jnp.sum(jnp.log(tmp)) if log else jnp.prod(tmp)
 
 
 def multivariate_gaussian_model(data):

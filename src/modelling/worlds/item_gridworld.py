@@ -117,18 +117,9 @@ def square_value_2d(v, square, c):
 
 def compute_state_values_1d(v, c):
     return jnp.array([square_value_1d(v, x, c) for x in range(LENGTH)])
-    # V = jnp.zeros(LENGTH)
-    # for i in range(LENGTH):
-    #     V[i] = square_value_1d(v, i, c)
-    # return V
 
 
 def compute_state_values_2d(v, c):
     return jnp.array(
         [[square_value_2d(v, (i, j), c) for j in range(LENGTH)] for i in range(LENGTH)]
     )
-    # V = jnp.zeros((LENGTH, LENGTH))
-    # for i in range(LENGTH):
-    #     for j in range(LENGTH):
-    #         V[i, j] = square_value_2d(v, (i, j), c)
-    # return V

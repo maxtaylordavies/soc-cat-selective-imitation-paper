@@ -137,14 +137,32 @@ def run_preliminary_simulations():
 
 
 def run_model_analysis():
-    model_name = "value_functions_known"
+    model_names = [
+        "value functions known",
+        "value functions inferred (individual)",
+        # "value functions inferred (group)",
+    ]
     use_2d = False
     data, weights, phis, vselfs = analyse_model_effectiveness(
-        rng_key, model_name, use_2d=use_2d, agents_per_phi=25, sigma=0.01, beta=0.05
+        rng_key,
+        model_names,
+        use_2d=use_2d,
+        num_phis=3,
+        agents_per_phi=30,
+        sigma=0.01,
+        beta=0.05,
+        num_traj=30,
     )
-    plot_model_effectiveness(
-        data, weights, phis, vselfs, f"results/{model_name}.pdf", use_2d=use_2d
-    )
+    for model_name in model_names:
+        plot_model_effectiveness(
+            data,
+            weights[model_name],
+            phis,
+            vselfs,
+            model_name,
+            f"results/{model_name}.pdf",
+            use_2d=use_2d,
+        )
 
 
 def run_human_data_analysis():
