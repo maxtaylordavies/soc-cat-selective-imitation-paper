@@ -1,6 +1,8 @@
 import numpy as np
+import jax.numpy as jnp
+from jax import random
 
-from .worlds.item_gridworld import (
+from .item_gridworld import (
     LENGTH,
     LOC_TO_ITEM_1D,
     LOC_TO_ITEM_2D,
@@ -20,6 +22,13 @@ from .worlds.item_gridworld import (
 MAX_STEPS = 50
 
 
+def simulate_choices(rng_key, v, beta, N):
+    v_ = jnp.array(item_values_2d(v[0], v[1], as_dict=False))
+    p = jnp.exp(v_ / beta)
+    p /= jnp.sum(p)
+    return random.choice(rng_key, len(v_), shape=(N,), p=p)
+
+
 def simulate_trajectories(rng_key, v, c, beta, N):
     if len(v) == 1:
         return simulate_trajectories_1d(rng_key, v, c, beta, N)
@@ -29,19 +38,23 @@ def simulate_trajectories(rng_key, v, c, beta, N):
 
 
 def simulate_trajectories_1d(rng_key, v, c, beta, N):
-    trajs = []
+    choices, trajs = [], []
     v_ = item_values_1d(v[0])
     for start in random_locs_1d(rng_key, N):
-        trajs.append(simulate_trajectory_1d(rng_key, v_, start, c, beta))
+        choice, traj = simulate_trajectory_1d(rng_key, v_, start, c, beta)
+        choices.append(choice)
+        trajs.append(traj)
     return trajs
 
 
 def simulate_trajectories_2d(rng_key, v, c, beta, N):
-    trajs = []
+    choices, trajs = [], []
     v_ = item_values_2d(v[0], v[1])
     for start in random_locs_2d(rng_key, N):
-        trajs.append(simulate_trajectory_2d(rng_key, v_, start, c, beta))
-    return trajs
+        choice, traj = simulate_trajectory_2d(rng_key, v_, start, c, beta)
+        choices.append(choice)
+        trajs.append(traj)
+    return choices, trajs
 
 
 def simulate_trajectory_1d(rng_key, v, start, c, beta, level="traj", V=None):
@@ -49,8 +62,8 @@ def simulate_trajectory_1d(rng_key, v, start, c, beta, level="traj", V=None):
     if level == "traj":
         trajs = [path_to_item_1d(start, item) for item in v.keys()]
         vals = [traj_reward_1d(traj, v, c) for traj in trajs]
-        choice_idx = choose(rng_key, np.array(vals), beta)
-        return trajs[choice_idx]
+        choice_idx = int(choose(rng_key, np.array(vals), beta))
+        return choice_idx, trajs[choice_idx]
 
     # make choices at step level
     if V is None:
@@ -76,8 +89,8 @@ def simulate_trajectory_2d(rng_key, v, start, c, beta, level="traj", V=None):
     if level == "traj":
         trajs = [path_to_item_2d(start, item) for item in v.keys()]
         vals = [traj_reward_2d(traj, v, c) for traj in trajs]
-        choice_idx = choose(rng_key, np.array(vals), beta)
-        return trajs[choice_idx]
+        choice_idx = int(choose(rng_key, np.array(vals), beta))
+        return choice_idx, trajs[choice_idx]
 
     # make choices at step level
     if V is None:

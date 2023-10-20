@@ -25,13 +25,21 @@ def item_values_1d(v):
     }
 
 
-def item_values_2d(vx, vy):
-    return {
-        "A": vy * (1 - vx),  # top left
-        "B": vy * vx,  # top right
-        "C": (1 - vy) * (1 - vx),  # bottom left
-        "D": (1 - vy) * vx,  # bottom right
-    }
+def item_values_2d(vx, vy, as_dict=True):
+    va = vy * (1 - vx)  # top left
+    vb = vy * vx  # top right
+    vc = (1 - vy) * (1 - vx)  # bottom left
+    vd = (1 - vy) * vx  # bottom right
+
+    if as_dict:
+        return {
+            "A": va,
+            "B": vb,
+            "C": vc,
+            "D": vd,
+        }
+
+    return va, vb, vc, vd
 
 
 def random_locs_1d(rng_key, n):

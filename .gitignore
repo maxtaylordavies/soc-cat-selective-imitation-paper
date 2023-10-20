@@ -1,5 +1,7 @@
 results/
+cluster/
 **/.DS_Store
 **/__pycache__/
 **/*.egg-info/
 tmp.py
+scratchpad/

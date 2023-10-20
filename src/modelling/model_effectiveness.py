@@ -1,9 +1,9 @@
+from jax import random
 import jax.numpy as jnp
-import numpyro.distributions as dist
 from tqdm import tqdm
 import pandas as pd
 
-from .preliminary import simulate_trajectories, simulate_imitation
+from .preliminary import simulate_choices, simulate_trajectories, simulate_imitation
 from .weighting_functions.explicit_value_functions import (
     value_funcs_known,
     value_funcs_inferred_individual,
@@ -47,8 +47,8 @@ def analyse_model_effectiveness_2d(
         jnp.array([1.0, 1.0]),
     ]
 
-    agents = _sample_agents(
-        rng_key, phis, mus, cov, agents_per_phi, beta=beta, c=c, num_traj=num_traj
+    agents = generate_behaviour(
+        rng_key, phis, mus, cov, agents_per_phi, num_traj, beta=beta, c=c
     )
     imitation_results = {"phi": [], "vx": [], "vy": [], "reward": [], "vself": []}
     weights = {model_name: [] for model_name in model_names}
@@ -82,11 +82,18 @@ def analyse_model_effectiveness_1d(
 ):
     phis = list(range(num_phis))
     mus = [jnp.array([mu]) for mu in jnp.linspace(0.1, 0.9, num_phis)]
-    cov = jnp.array([[sigma]])
+    sigmas = [jnp.array([sigma, sigma]) for _ in range(num_phis)]
     vselfs = [jnp.array([0.0]), jnp.array([0.5]), jnp.array([1.0])]
 
-    agents = _sample_agents(
-        rng_key, phis, mus, cov, agents_per_phi, beta=beta, c=c, num_traj=num_traj
+    agents = generate_behaviour(
+        rng_key,
+        phis,
+        mus,
+        sigmas,
+        agents_per_phi,
+        num_traj,
+        beta=beta,
+        c=c,
     )
     imitation_results = {"phi": [], "v": [], "reward": [], "vself": []}
     weights = {model_name: [] for model_name in model_names}
@@ -107,12 +114,27 @@ def analyse_model_effectiveness_1d(
     return pd.DataFrame(imitation_results), weights, phis, vselfs
 
 
-def _sample_agents(rng_key, phis, mus, cov, agents_per_phi, beta=0.01, c=0.1, num_traj=0):
+def generate_behaviour(
+    rng_key, weights, mus, sigmas, num_agents, num_trials, beta=0.01, c=0.1
+):
     agents = []
+    z = random.categorical(rng_key, weights, shape=(num_agents,))
+    for m in tqdm(range(num_agents), desc="sampling behaviour"):
+        v = random.multivariate_normal(rng_key, mus[z[m]], jnp.diag(sigmas[z[m]]))
+        choices, trajs = simulate_trajectories(rng_key, v, c=c, beta=beta, N=num_trials)
+        agents.append({"phi": z[m], "v": v, "choices": choices, "trajs": trajs})
 
-    for phi in tqdm(phis, desc="sampling agents"):
-        for v in dist.MultivariateNormal(mus[phi], cov).sample(rng_key, (agents_per_phi,)):
-            trajs = simulate_trajectories(rng_key, v, c=c, beta=beta, N=num_traj)
-            agents.append({"phi": phi, "v": v, "trajs": trajs})
+    return agents
+
+
+def generate_behaviour_simple(
+    rng_key, weights, mus, sigmas, num_agents, num_trials, beta=0.01
+):
+    agents = []
+    z = random.categorical(rng_key, weights, shape=(num_agents,))
+    for m in tqdm(range(num_agents), desc="sampling behaviour"):
+        v = random.multivariate_normal(rng_key, mus[z[m]], jnp.diag(sigmas[z[m]]))
+        choices = simulate_choices(rng_key, v, beta=beta, N=num_trials)
+        agents.append({"phi": z[m], "v": v, "choices": choices})
 
     return agents
