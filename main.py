@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 
 from jax import random
@@ -136,32 +137,32 @@ def run_preliminary_simulations():
     #     )
 
 
-def run_model_analysis():
+def run_model_analysis(results_dir: str):
+    K, M, N = 5, 1000, 10000
+    sigma = 0.01
+    beta = 1.0
+    c = 0.1
+
     model_names = [
-        "value functions known",
-        "value functions inferred (individual)",
+        # "value functions known",
+        # "value functions inferred (individual)",
         # "value functions inferred (group)",
+        "full bayesian",
     ]
-    use_2d = False
-    data, weights, phis, vselfs = analyse_model_effectiveness(
-        rng_key,
-        model_names,
-        use_2d=use_2d,
-        num_phis=3,
-        agents_per_phi=30,
-        sigma=0.01,
-        beta=0.05,
-        num_traj=30,
+
+    results, weights, phis, vselfs = analyse_model_effectiveness(
+        rng_key, model_names, M=M, N=N, K=K, sigma=sigma, beta=beta, c=c, plot_dir=results_dir
     )
-    for model_name in model_names:
+
+    for mn in model_names:
+        key = mn.replace(" ", "_")
         plot_model_effectiveness(
-            data,
-            weights[model_name],
+            results,
+            weights,
             phis,
             vselfs,
-            model_name,
-            f"results/{model_name}.pdf",
-            use_2d=use_2d,
+            mn,
+            filename=f"{results_dir}/model_effectiveness_{key}.png",
         )
 
 
@@ -201,10 +202,15 @@ def run_human_model_comparison():
 
 
 def main():
-    # run_preliminary_simulations()
-    run_model_analysis()
-    # run_human_data_analysis()
-    # run_human_model_comparison()
+    # define run name based on current date and time
+    run_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    results_dir = f"results/{run_name}"
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
+
+    run_model_analysis(results_dir)
+    # run_human_data_analysis(results_dir)
+    # run_human_model_comparison(results_dir)
 
 
 if __name__ == "__main__":

@@ -4,18 +4,12 @@ from jax import random
 
 from .item_gridworld import (
     LENGTH,
-    LOC_TO_ITEM_1D,
-    LOC_TO_ITEM_2D,
-    item_values_1d,
-    item_values_2d,
-    random_locs_1d,
-    random_locs_2d,
-    compute_state_values_1d,
-    compute_state_values_2d,
-    path_to_item_1d,
-    path_to_item_2d,
-    traj_reward_1d,
-    traj_reward_2d,
+    LOC_TO_ITEM,
+    item_values,
+    random_locs,
+    compute_state_values,
+    path_to_item,
+    traj_reward,
     choose,
 )
 
@@ -23,83 +17,38 @@ MAX_STEPS = 50
 
 
 def simulate_choices(rng_key, v, beta, N):
-    v_ = jnp.array(item_values_2d(v[0], v[1], as_dict=False))
+    v_ = jnp.array(item_values(v[0], v[1], as_dict=False))
     p = jnp.exp(v_ / beta)
     p /= jnp.sum(p)
     return random.choice(rng_key, len(v_), shape=(N,), p=p)
 
 
 def simulate_trajectories(rng_key, v, c, beta, N):
-    if len(v) == 1:
-        return simulate_trajectories_1d(rng_key, v, c, beta, N)
-    elif len(v) == 2:
-        return simulate_trajectories_2d(rng_key, v, c, beta, N)
-    raise Exception(f"got unsupported number of dimensions {len(v)}")
-
-
-def simulate_trajectories_1d(rng_key, v, c, beta, N):
     choices, trajs = [], []
-    v_ = item_values_1d(v[0])
-    for start in random_locs_1d(rng_key, N):
-        choice, traj = simulate_trajectory_1d(rng_key, v_, start, c, beta)
-        choices.append(choice)
-        trajs.append(traj)
-    return trajs
-
-
-def simulate_trajectories_2d(rng_key, v, c, beta, N):
-    choices, trajs = [], []
-    v_ = item_values_2d(v[0], v[1])
-    for start in random_locs_2d(rng_key, N):
-        choice, traj = simulate_trajectory_2d(rng_key, v_, start, c, beta)
+    v_ = item_values(v[0], v[1])
+    for start in random_locs(rng_key, N):
+        choice, traj = simulate_trajectory(rng_key, v_, start, c, beta)
         choices.append(choice)
         trajs.append(traj)
     return choices, trajs
 
 
-def simulate_trajectory_1d(rng_key, v, start, c, beta, level="traj", V=None):
+def simulate_trajectory(rng_key, v, start, c, beta, level="traj", V=None):
     # make choice at trajectory level
     if level == "traj":
-        trajs = [path_to_item_1d(start, item) for item in v.keys()]
-        vals = [traj_reward_1d(traj, v, c) for traj in trajs]
+        trajs = [path_to_item(start, item) for item in v.keys()]
+        vals = [traj_reward(traj, v, c) for traj in trajs]
         choice_idx = int(choose(rng_key, np.array(vals), beta))
         return choice_idx, trajs[choice_idx]
 
     # make choices at step level
     if V is None:
-        V = compute_state_values_1d(v, c)
+        V = compute_state_values(v, c)
 
     states, steps = [start], 0
     while steps < MAX_STEPS:
         pos = states[-1]
-        if pos in LOC_TO_ITEM_1D:
-            break
-
-        next_states = [pos - 1, pos + 1]
-        vals = [V[s] for s in next_states]
-        choice_idx = choose(rng_key, np.array(vals), beta)
-        states.append(next_states[choice_idx])
-        steps += 1
-
-    return states
-
-
-def simulate_trajectory_2d(rng_key, v, start, c, beta, level="traj", V=None):
-    # make choice at trajectory level
-    if level == "traj":
-        trajs = [path_to_item_2d(start, item) for item in v.keys()]
-        vals = [traj_reward_2d(traj, v, c) for traj in trajs]
-        choice_idx = int(choose(rng_key, np.array(vals), beta))
-        return choice_idx, trajs[choice_idx]
-
-    # make choices at step level
-    if V is None:
-        V = compute_state_values_2d(v, c)
-
-    states, steps = [start], 0
-    while steps < MAX_STEPS:
-        pos = states[-1]
-        if pos in LOC_TO_ITEM_2D:
+        if pos in LOC_TO_ITEM:
             break
 
         # determine legal moves
@@ -118,52 +67,34 @@ def simulate_trajectory_2d(rng_key, v, start, c, beta, level="traj", V=None):
     return states
 
 
-def visualise_trajectory_2d(traj):
+def visualise_trajectory(traj):
     grid = np.zeros((LENGTH, LENGTH))
     for i in range(LENGTH):
         for j in range(LENGTH):
-            if (i, j) in LOC_TO_ITEM_2D:
+            if (i, j) in LOC_TO_ITEM:
                 grid[i, j] = 0.5
             elif (i, j) in traj:
                 grid[i, j] = 1
     return grid
 
 
-def simulate_imitation_1d(rng_key, vself, vm, c, beta, trials, level):
-    vself_ = item_values_1d(v=vself[0])
-    vm_ = item_values_1d(v=vm[0])
-    V = compute_state_values_1d(vm_, c)
+def simulate_imitation_old(rng_key, vself, vm, c=0.1, beta=0.01, trials=10000, level="traj"):
+    vself_ = item_values(vx=float(vself[0]), vy=float(vself[1]))
+    vm_ = item_values(vx=float(vm[0]), vy=float(vm[1]))
+    V = compute_state_values(vm_, c)
 
     rewards, proportions = np.zeros(trials), np.zeros(trials)
 
     # generate trajectory choices from random starting locations
-    for i, start in enumerate(random_locs_1d(rng_key, trials)):
-        traj = simulate_trajectory_1d(rng_key, vm_, start, c=c, beta=beta, level=level, V=V)
-        rewards[i] = traj_reward_1d(traj, vself_, c)
-        proportions[i] = traj_reward_1d(traj, vm_, c) / V[start]
+    for i, start in enumerate(random_locs(rng_key, trials)):
+        _, traj = simulate_trajectory(rng_key, vm_, start, c=c, beta=beta, level=level, V=V)
+        rewards[i] = traj_reward(traj, vself_, c)
+        proportions[i] = traj_reward(traj, vm_, c) / V[start[0], start[1]]
 
     return np.mean(rewards), np.mean(proportions)
 
 
-def simulate_imitation_2d(rng_key, vself, vm, c, beta, trials, level):
-    vself_ = item_values_2d(vx=vself[0], vy=vself[1])
-    vm_ = item_values_2d(vx=vm[0], vy=vm[1])
-    V = compute_state_values_2d(vm_, c)
-
-    rewards, proportions = np.zeros(trials), np.zeros(trials)
-
-    # generate trajectory choices from random starting locations
-    for i, start in enumerate(random_locs_2d(rng_key, trials)):
-        traj = simulate_trajectory_2d(rng_key, vm_, start, c=c, beta=beta, level=level, V=V)
-        rewards[i] = traj_reward_2d(traj, vself_, c)
-        proportions[i] = traj_reward_2d(traj, vm_, c) / V[start[0], start[1]]
-
-    return np.mean(rewards), np.mean(proportions)
-
-
-def simulate_imitation(rng_key, vself, vm, c=0.1, beta=0.01, trials=10000, level="traj"):
-    if len(vm) == 1:
-        return simulate_imitation_1d(rng_key, vm, vself, c, beta, trials, level)
-    elif len(vm) == 2:
-        return simulate_imitation_2d(rng_key, vm, vself, c, beta, trials, level)
-    raise Exception(f"got unsupported number of dimensions {len(vm)}")
+def simulate_imitation(vself, choices):
+    vself_ = item_values(vx=float(vself[0]), vy=float(vself[1]), as_dict=False)
+    vself_ = jnp.array(vself_)
+    return jnp.mean(vself_[choices])

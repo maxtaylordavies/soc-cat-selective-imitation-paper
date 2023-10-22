@@ -1,3 +1,4 @@
+import numpy as np
 import matplotlib.pylab as pylab
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -89,131 +90,13 @@ def surfaceplot(
     fig.savefig(f"{filename}.{format}")
 
 
-def plot_model_effectiveness(data, weights, phis, vselfs, model_name, filename, use_2d=False):
-    if use_2d:
-        plot_model_effectiveness_2d(data, weights, phis, vselfs, model_name, filename)
-    else:
-        plot_model_effectiveness_1d(data, weights, phis, vselfs, model_name, filename)
-
-
-def plot_model_effectiveness_1d(data, weights, phis, vselfs, filename):
+def plot_model_effectiveness(data, weights, phis, vselfs, model_name, filename):
     fig, axs = plt.subplots(3, len(vselfs), figsize=(12, 8), sharex=False, sharey="row")
     palette = sns.color_palette("viridis", n_colors=len(phis))
 
     for i, vself in enumerate(vselfs):
         df = data[data["vself"] == i]
 
-        # plot histogram of value functions
-        sns.histplot(
-            data=df,
-            stat="probability",
-            x="v",
-            hue="phi",
-            bins=20,
-            alpha=0.5,
-            zorder=1,
-            kde=True,
-            line_kws={
-                "linewidth": 2.5,
-                "alpha": 1.0,
-            },
-            legend=False,
-            ax=axs[0, i],
-            palette=palette,
-        )
-        axs[0, i].set(
-            xlabel="$\mathbf{v}$",
-            ylabel="$p(\mathbf{v}|\phi)$",
-            title=f"$\mathbf{{v}}^{{(self)}}={vself[0]}$",
-        )
-
-        # plot imitation rewards
-        sns.stripplot(
-            data=df,
-            x="phi",
-            y="reward",
-            hue="phi",
-            dodge=True,
-            alpha=0.2,
-            zorder=1,
-            legend=False,
-            ax=axs[1, i],
-            palette=palette,
-        )
-        sns.pointplot(
-            data=df,
-            x="phi",
-            y="reward",
-            hue="phi",
-            join=False,
-            dodge=0.8 - 0.8 / 3,
-            # markers="d",
-            scale=1.25,
-            errorbar=None,
-            ax=axs[1, i],
-            palette=palette,
-        )
-        ylabel = "Imitation reward" if i == 0 else None
-        axs[1, i].set(xlabel=None, xticks=[], xticklabels=[], ylabel=ylabel)
-        axs[1, i].legend([], [], frameon=False)
-
-        tmp = [
-            {"model": k, "phi": phis[j], "w": float(v[i][j])}
-            for k, v in weights.items()
-            for j in range(len(phis))
-        ]
-        weights_df = pd.DataFrame(tmp)
-
-        sns.lineplot(
-            data=weights_df,
-            x="phi",
-            y="w",
-            style="model",
-            markers=True,
-            ax=axs[2, i],
-            palette=palette,
-            legend=i == len(vselfs) - 1,
-        )
-
-        # plot computed weights
-        # sns.barplot(
-        #     x=phis,
-        #     y=weights[i],
-        #     ax=axs[2, i],
-        #     palette=palette,
-        # )
-
-        ylabel = "Weight" if i == 0 else None
-        axs[2, i].set(ylim=(0, 1), xlabel="$\phi$", ylabel=ylabel)
-
-    fig.suptitle("Comparison of approaches in 1D gridworld", fontsize=16)
-    fig.tight_layout()
-
-    plt.show()
-    fig.savefig(filename)
-
-
-def plot_model_effectiveness_2d(data, weights, phis, vselfs, model_name, filename):
-    fig, axs = plt.subplots(3, len(vselfs), figsize=(12, 8), sharex=False, sharey="row")
-    palette = sns.color_palette("viridis", n_colors=len(phis))
-
-    for i, vself in enumerate(vselfs):
-        df = data[data["vself"] == i]
-
-        # plot histogram of value functions
-        sns.histplot(
-            data=df,
-            stat="probability",
-            x="vx",
-            y="vy",
-            hue="phi",
-            alpha=0.4,
-            bins=30,
-            zorder=1,
-            legend=False,
-            ax=axs[0, i],
-            palette=palette,
-        )
         sns.kdeplot(
             data=df,
             stat="probability",
@@ -223,6 +106,7 @@ def plot_model_effectiveness_2d(data, weights, phis, vselfs, model_name, filenam
             alpha=0.7,
             zorder=2,
             levels=5,
+            fill=True,
             legend=False,
             ax=axs[0, i],
             palette=palette,
@@ -275,8 +159,8 @@ def plot_model_effectiveness_2d(data, weights, phis, vselfs, model_name, filenam
 
         # plot computed weights
         sns.barplot(
-            x=phis,
-            y=weights[i],
+            x=np.array(phis),
+            y=np.array(weights[model_name][i]),
             ax=axs[2, i],
             palette=palette,
         )
@@ -285,6 +169,4 @@ def plot_model_effectiveness_2d(data, weights, phis, vselfs, model_name, filenam
 
     fig.suptitle(model_name, fontsize=16)
     fig.tight_layout()
-
-    plt.show()
-    # fig.savefig(filename)
+    fig.savefig(filename)

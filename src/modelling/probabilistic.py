@@ -98,6 +98,7 @@ def run_svi(
     init_vals_func,
     visible_site_names,
     plot_convergence=False,
+    plot_dir="results/tmp",
     init_iter=50,
     run_iter=200,
 ):
@@ -133,7 +134,7 @@ def run_svi(
         plt.ylabel("loss")
         plt.yscale("log")
         plt.title("Convergence of SVI")
-        plt.show()
+        plt.savefig(f"{plot_dir}/svi_convergence.png")
 
         plt.figure(figsize=(10, 4), dpi=100).set_facecolor("white")
         for name, grad_norms in gradient_norms.items():
@@ -143,6 +144,6 @@ def run_svi(
         plt.yscale("log")
         plt.legend(loc="best")
         plt.title("Gradient norms during SVI")
-        plt.show()
+        plt.savefig(f"{plot_dir}/svi_gradient_norms.png")
 
     return svi_result.params

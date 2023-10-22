@@ -7,8 +7,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from ..item_gridworld import item_values_2d
+from ..item_gridworld import item_values
 from ..probabilistic import run_svi
+from src.utils.utils import value_similarity, log, norm_unit_sum
 
 sns.set_theme()
 
@@ -55,7 +56,7 @@ def gmm_2d(data):
         # sample a value function for each agent according to the sampled group assignments,
         # and convert each value function into a probability distribution over the four items
         v = numpyro.sample("v", dist.MultivariateNormal(mu[z], covs[z]))
-        v_ = jnp.stack(item_values_2d(v[..., 0], v[..., 1], as_dict=False), axis=-1)
+        v_ = jnp.stack(item_values(v[..., 0], v[..., 1], as_dict=False), axis=-1)
         p = jnp.exp(v_ / beta)
         p /= jnp.sum(p, axis=-1, keepdims=True)
 
@@ -70,7 +71,13 @@ def gmm_2d(data):
 
 
 def infer_conditional_v_distributions(
-    rng_key, data, v_domain, plot_convergence=False, init_iter=50, run_iter=200
+    rng_key,
+    data,
+    v_domain,
+    plot_convergence=False,
+    plot_dir="results/tmp",
+    init_iter=50,
+    run_iter=200,
 ):
     _, phis, K, _ = data
 
@@ -93,6 +100,7 @@ def infer_conditional_v_distributions(
         init_vals_func,
         ["weights", "mu", "sigma1", "sigma2", "components", "phi_weights"],
         plot_convergence=plot_convergence,
+        plot_dir=plot_dir,
         init_iter=init_iter,
         run_iter=run_iter,
     )
@@ -125,6 +133,35 @@ def infer_conditional_v_distributions(
     phi_probs /= jnp.sum(phi_probs, axis=1, keepdims=True)
 
     return phi_probs
+
+
+def full_bayesian(rng_key, agents, phis, K, beta, v_self, v_domain, plot_dir):
+    weights = jnp.zeros(len(phis))
+
+    choice_counts = jnp.zeros((len(agents), 4))
+    _phis = jnp.zeros(len(agents), dtype=int)
+    for m, a in enumerate(agents):
+        tmp = jnp.array(a["choices"])
+        choice_counts = choice_counts.at[m].set(jnp.bincount(tmp, minlength=4))
+        _phis = _phis.at[m].set(a["phi"])
+
+    posterior = infer_conditional_v_distributions(
+        rng_key=rng_key,
+        data=(choice_counts, _phis, K, beta),
+        v_domain=v_domain,
+        plot_convergence=True,
+        plot_dir=plot_dir,
+        init_iter=100,
+    )
+
+    visualise_conditional_posterior(rng_key, v_domain, posterior, f"{plot_dir}/posterior.png")
+
+    sims = jnp.array([value_similarity(v_self, v) for v in v_domain])
+    for i, phi in enumerate(phis):
+        expected_sim = jnp.sum(sims * posterior[i])
+        weights = weights.at[i].set(expected_sim)
+
+    return norm_unit_sum(weights)
 
 
 def visualise_group_parameters(rng_key, mus, sigmas, fpath):
