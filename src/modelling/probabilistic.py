@@ -99,8 +99,8 @@ def run_svi(
     visible_site_names,
     plot_convergence=False,
     plot_dir="results/tmp",
-    init_iter=50,
-    run_iter=200,
+    init_iter=100,
+    run_iter=1000,
 ):
     elbo = TraceEnum_ELBO()
 
@@ -122,7 +122,10 @@ def run_svi(
     loss, guide = initialize(seed, return_guide=True)  # initialize the guide
 
     # train the model
-    optim, gradient_norms = hook_optax(optax.adam(learning_rate=0.1, b1=0.8, b2=0.99))
+    optim, gradient_norms = hook_optax(
+        optax.chain(optax.clip(10.0), optax.adam(learning_rate=1e-2, b1=0.8, b2=0.99))
+    )
+    # optim = numpyro.optim.Adam(step_size=1e-2)
     svi = SVI(model, guide, optim, loss=elbo)
     svi_result = svi.run(rng_key, run_iter, data)
 
