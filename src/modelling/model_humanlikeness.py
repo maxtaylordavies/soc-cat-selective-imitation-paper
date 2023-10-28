@@ -1,86 +1,92 @@
-import numpy as np
+from jax import random
+import jax.numpy as jnp
 import pandas as pd
-from tqdm import tqdm
 
 from .weighting_functions.baselines import indiscriminate, ingroup_bias
-from .weighting_functions.explicit_value_functions import value_funcs_known
+from .weighting_functions.full_bayesian import full_bayesian
+from ..utils import v_domain_2d
 
 
 def _init_results_dict():
     return {
         "agent": [],
         "similarity": [],
-        "own_group_visible": [],
         "agents_known": [],
+        "own_group_visible": [],
         "groups_relevant": [],
     }
 
 
-def choose_agent(
-    agent_categories: np.ndarray, category_weights: np.ndarray, beta: float
-) -> int:
-    # compute boltzmann probabilities
-    w = category_weights[agent_categories]
-    p = np.exp(w / beta)
-    p /= np.sum(p)
-
-    # Choose agent
-    return np.random.choice(len(w), p=p)
-
-
-def simulate_agent_choice(
-    agent_categories: np.ndarray,
-    category_weights: np.ndarray,
+def simulate_imitation_choices(
+    rng_key: random.KeyArray,
+    phis: jnp.ndarray,
+    weights: jnp.ndarray,
     beta: float,
     repeats: int,
-    own_group_visible: bool,
     agents_known: bool,
+    own_group_visible: bool,
+    groups_relevant: bool,
 ) -> pd.DataFrame:
     results = _init_results_dict()
 
-    for _ in tqdm(range(repeats)):
-        choice = choose_agent(agent_categories, category_weights, beta)
-        for j in range(len(agent_categories)):
-            results["agent"].append(j)
-            results["similarity"].append(int(choice == j))
-            results["agents_known"].append(False)
+    p = jnp.exp(weights[phis] / beta)
+    p /= jnp.sum(p)
+    choices = random.choice(rng_key, phis, shape=(repeats,), p=p)
+
+    for choice in choices:
+        for phi in phis:
+            results["agent"].append(int(phi))
+            results["similarity"].append(int(choice == phi))
+            results["agents_known"].append(agents_known)
             results["own_group_visible"].append(own_group_visible)
-            results["groups_relevant"].append(agents_known)
+            results["groups_relevant"].append(groups_relevant)
 
     return pd.DataFrame(results)
 
 
 def simulate_strategy(
-    agent_categories: np.ndarray,
+    rng_key: random.KeyArray,
     strategy: str,
+    obs_history: list,
+    target_phis: jnp.ndarray,
+    v_self: jnp.ndarray,
+    phi_self: int,
+    ingroup_strength: float,
     beta: float,
+    beta_self: float,
     repeats: int,
-    own_cat=0,
-    ingroup_strength=1.0,
-) -> pd.DataFrame:
+    plot_dir: str = "results/tmp",
+):
     df = pd.DataFrame(_init_results_dict())
-    for ogv in [True, False]:  # own group visible
-        for gr in [True, False]:  # groups relevant
-            if strategy == "value func inference":
-                weights = value_funcs_known(
-                    # agent_categories,
-                    # np.arange(len(agent_categories)),
-                    # agent_categories[own_cat],
-                )
-            elif strategy == "latent group inference":
-                raise NotImplementedError
-            elif strategy == "ingroup bias" and ogv:
-                weights = ingroup_bias(len(agent_categories), own_cat, ingroup_strength)
-            else:
-                weights = indiscriminate(len(agent_categories))
 
-            tmp = simulate_agent_choice(
-                agent_categories,
+    v_domain = v_domain_2d()
+    all_phis = jnp.unique(jnp.array([a["phi"] for a in obs_history]))
+
+    for ogv in [True, False]:  # own group visible
+        for gr in [True, False]:
+            if strategy == "full bayesian":
+                weights = full_bayesian(
+                    rng_key,
+                    obs_history,
+                    beta,
+                    v_self,
+                    v_domain,
+                    plot_dir=plot_dir,
+                )
+            elif strategy == "ingroup bias" and ogv:
+                weights = ingroup_bias(len(all_phis), phi_self, ingroup_strength)
+            else:
+                weights = indiscriminate(len(all_phis))
+
+            tmp = simulate_imitation_choices(
+                rng_key,
+                target_phis,
                 weights,
-                beta,
+                beta_self,
                 repeats,
+                agents_known=False,
                 own_group_visible=ogv,
-                agents_known=gr,
+                groups_relevant=gr,
             )
             df = pd.concat([df, tmp])
 

@@ -1,5 +1,6 @@
 results/
-cluster/
+cluster*/
+slurm_logs/
 **/.DS_Store
 **/__pycache__/
 **/*.egg-info/

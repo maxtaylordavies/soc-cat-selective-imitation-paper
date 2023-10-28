@@ -92,3 +92,9 @@ def mean_pool_2d(x: jnp.ndarray, pool_size: int):
     r, c = r // pool_size, c // pool_size
     tmp = jnp.mean(x.reshape(r, pool_size, c, pool_size), axis=(1, 3))
     return jnp.repeat(jnp.repeat(tmp, pool_size, axis=0), pool_size, axis=1)
+
+
+def v_domain_2d(low=-0.5, high=1.5, bins=100):
+    return jnp.stack(
+        jnp.meshgrid(jnp.linspace(low, high, bins), jnp.linspace(low, high, bins)), axis=-1
+    ).reshape((-1, 2))

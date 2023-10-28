@@ -15,7 +15,9 @@ pylab.rcParams.update(
 )
 
 
-def make_condition_barplots(data, flavour="binary", filename=None, format="svg"):
+def make_condition_barplots(
+    data, flavour="binary", plot_dir="results/tmp", filename=None, format="svg"
+):
     fig, axs = plt.subplots(3, 2, sharex=True, sharey=True, figsize=(8, 8))
     for i, vis in enumerate([False, True]):
         df = data[data["own_group_visible"] == vis]
@@ -32,7 +34,7 @@ def make_condition_barplots(data, flavour="binary", filename=None, format="svg")
     fig.tight_layout()
 
     filename = filename or f"barplots_{flavour}"
-    fig.savefig(f"results/{filename}.{format}")
+    fig.savefig(f"{plot_dir}/{filename}.{format}")
 
 
 def barplot(data, ax, flavour="binary", show_x_label=True, show_y_label=True):

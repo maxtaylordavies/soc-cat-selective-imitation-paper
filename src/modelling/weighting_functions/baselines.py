@@ -1,11 +1,11 @@
-import numpy as np
+import jax.numpy as jnp
 
 
-def indiscriminate(num_cats: int) -> np.ndarray:
-    return np.ones(num_cats) / num_cats
+def indiscriminate(num_phis: int) -> jnp.ndarray:
+    return jnp.ones(num_phis) / num_phis
 
 
-def ingroup_bias(num_cats: int, own_cat: int, strength: float) -> np.ndarray:
-    weights = -np.ones(num_cats)
-    weights[own_cat] = 1
+def ingroup_bias(num_phis: int, phi_self: int, strength: float) -> jnp.ndarray:
+    weights = jnp.zeros(num_phis)
+    weights = weights.at[phi_self].set(1.0)
     return weights * strength

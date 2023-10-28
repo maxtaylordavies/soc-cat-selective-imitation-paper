@@ -14,7 +14,7 @@ from src.utils.utils import value_similarity, log, norm_unit_sum
 
 sns.set_theme()
 
-max_num_clusters = 8
+max_num_clusters = 12
 
 
 def stickbreak(betas):
@@ -92,7 +92,7 @@ def dpmm(data):
     choices, phis, noise = data
     choices_per_agent = jnp.sum(choices[0])
 
-    alpha = numpyro.sample("alpha", dist.Gamma(1, 2))
+    alpha = numpyro.sample("alpha", dist.Gamma(1, 1))
     with numpyro.plate("beta_plate", max_num_clusters - 1):
         # sample beta parameters
         beta = numpyro.sample("beta", dist.Beta(1, alpha))
@@ -100,7 +100,7 @@ def dpmm(data):
     with numpyro.plate("theta_plate", max_num_clusters):
         # sample mixture component means from a normal distribution
         mu = numpyro.sample(
-            "mu", dist.MultivariateNormal(jnp.zeros(2) + 0.5, 0.1 * jnp.eye(2))
+            "mu", dist.MultivariateNormal(jnp.zeros(2) + 0.5, 1.0 * jnp.eye(2))
         )
 
         # sample covariance matrices. each component's covariance matrix is
@@ -154,7 +154,7 @@ def infer_conditional_v_distributions(
     v_domain,
     intermediate_plots=False,
     plot_dir="results/tmp",
-    init_iter=100,
+    init_iter=200,
     run_iter=1000,
 ):
     _, phis, _ = data
@@ -164,7 +164,7 @@ def infer_conditional_v_distributions(
         "mu": random.multivariate_normal(
             random.PRNGKey(seed),
             jnp.zeros(2) + 0.5,
-            0.1 * jnp.eye(2),
+            1.0 * jnp.eye(2),
             shape=(max_num_clusters,),
         ),
         "sigma1": 0.5 * jnp.ones(max_num_clusters),
@@ -204,9 +204,6 @@ def infer_conditional_v_distributions(
 
     # compute mixture weights from beta parameters
     mixture_weights = stickbreak(betas)
-    print("mixture_weights:")
-    print(mixture_weights)
-    print(mixture_weights.shape)
 
     if intermediate_plots:
         fig, ax = plt.subplots()
@@ -242,7 +239,8 @@ def infer_conditional_v_distributions(
     return phi_probs
 
 
-def full_bayesian(rng_key, agents, phis, K, beta, v_self, v_domain, plot_dir):
+def full_bayesian(rng_key, agents, beta, v_self, v_domain, plot_dir):
+    phis = jnp.unique(jnp.array([a["phi"] for a in agents]))
     weights = jnp.zeros(len(phis))
 
     choice_counts = jnp.zeros((len(agents), 4))
@@ -254,11 +252,10 @@ def full_bayesian(rng_key, agents, phis, K, beta, v_self, v_domain, plot_dir):
 
     posterior = infer_conditional_v_distributions(
         rng_key=rng_key,
-        data=(choice_counts, _phis, K, beta),
+        data=(choice_counts, _phis, beta),
         v_domain=v_domain,
-        plot_convergence=True,
+        intermediate_plots=False,
         plot_dir=plot_dir,
-        init_iter=100,
     )
 
     visualise_conditional_posterior(rng_key, v_domain, posterior, f"{plot_dir}/posterior.png")
@@ -295,7 +292,7 @@ def visualise_group_parameters(rng_key, mus, sigmas, fpath, num_samples=1000):
     fig.savefig(fpath)
 
 
-def visualise_conditional_posterior(rng_key, v_domain, posterior, fpath, num_samples=1000):
+def visualise_conditional_posterior(rng_key, v_domain, posterior, fpath, num_samples=250):
     data = []
     num_phis = posterior.shape[0]
     for phi in range(num_phis):
@@ -315,7 +312,7 @@ def visualise_conditional_posterior(rng_key, v_domain, posterior, fpath, num_sam
         hue="phi",
         fill=True,
         palette=sns.color_palette("viridis", n_colors=num_phis),
-        levels=5,
+        levels=4,
         legend=False,
         ax=ax,
     )

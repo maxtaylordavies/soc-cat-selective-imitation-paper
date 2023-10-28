@@ -6,6 +6,7 @@ import pandas as pd
 from .preliminary import simulate_choices, simulate_trajectories, simulate_imitation
 from .weighting_functions.explicit_value_functions import value_funcs_known
 from .weighting_functions.full_bayesian import full_bayesian
+from ..utils import v_domain_2d
 
 
 MODELS = {
@@ -17,18 +18,12 @@ MODELS = {
 def analyse_model_effectiveness(
     rng_key,
     model_names,
-    M=1000,
-    N=10000,
+    obs_history,
     K=5,
-    sigma=0.01,
-    beta=0.05,
-    c=0.1,
+    beta=0.1,
     plot_dir="results/tmp",
 ):
     phis = jnp.arange(K)
-    weights = jnp.ones(K) / K
-    sigmas = sigma * jnp.ones((K, 2))
-    mus = jnp.array([[0.0, 0.0], [0.0, 1.0], [0.5, 0.5], [1.0, 0.0], [1.0, 1.0]])
     v_selfs = jnp.array(
         [
             [0.5, 0.5],
@@ -37,23 +32,18 @@ def analyse_model_effectiveness(
             [1.0, 1.0],
         ]
     )
+    v_domain = v_domain_2d()
 
-    bins = 100
-    v_domain = jnp.stack(
-        jnp.meshgrid(jnp.linspace(-0.5, 1.5, bins), jnp.linspace(-0.5, 1.5, bins)), axis=-1
-    ).reshape((-1, 2))
-
-    agents = generate_behaviour_simple(rng_key, weights, mus, sigmas, M, N, beta=beta)
     imitation_results = {"phi": [], "vx": [], "vy": [], "reward": [], "vself": []}
     weights = {model_name: [] for model_name in model_names}
 
     for i, v_self in enumerate(v_selfs):
         # simulate imitating each agent
-        for a in tqdm(agents, desc="simulating imitation"):
-            reward = simulate_imitation(v_self, a["choices"])
-            imitation_results["phi"].append(int(a["phi"]))
-            imitation_results["vx"].append(float(a["v"][0]))
-            imitation_results["vy"].append(float(a["v"][1]))
+        for agent in tqdm(obs_history, desc="simulating imitation"):
+            reward = simulate_imitation(v_self, agent["choices"])
+            imitation_results["phi"].append(int(agent["phi"]))
+            imitation_results["vx"].append(float(agent["v"][0]))
+            imitation_results["vy"].append(float(agent["v"][1]))
             imitation_results["reward"].append(float(reward))
             imitation_results["vself"].append(i)
 
@@ -61,7 +51,7 @@ def analyse_model_effectiveness(
         for model_name in model_names:
             weights[model_name].append(
                 MODELS[model_name](
-                    rng_key, agents, phis, K, beta, v_self, v_domain, plot_dir=plot_dir
+                    rng_key, obs_history, beta, v_self, v_domain, plot_dir=plot_dir
                 )
             )
 

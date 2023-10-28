@@ -1,3 +1,5 @@
+import argparse
+import time
 from datetime import datetime
 import os
 
@@ -16,10 +18,52 @@ from src.utils import (
     value_similarity,
 )
 from src.human import analyse_sessions
-from src.modelling import simulate_strategy, simulate_imitation, analyse_model_effectiveness
+from src.modelling import (
+    simulate_strategy,
+    simulate_imitation,
+    analyse_model_effectiveness,
+    generate_behaviour_simple,
+)
 
 
-rng_key = random.PRNGKey(0)
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--M",
+        type=int,
+        default=500,
+    )
+    parser.add_argument(
+        "--N",
+        type=int,
+        default=1000,
+    )
+    parser.add_argument(
+        "--K",
+        type=int,
+        default=5,
+    )
+    parser.add_argument(
+        "--sigma",
+        type=float,
+        default=0.01,
+    )
+    parser.add_argument(
+        "--beta",
+        type=float,
+        default=0.5,
+    )
+    parser.add_argument(
+        "--beta-self",
+        type=float,
+        default=0.1,
+    )
+    parser.add_argument(
+        "--c",
+        type=float,
+        default=0.1,
+    )
+    return parser.parse_args()
 
 
 def run_preliminary_simulations():
@@ -137,12 +181,19 @@ def run_preliminary_simulations():
     #     )
 
 
-def run_model_analysis(results_dir: str):
-    K, M, N = 5, 1000, 10000
-    sigma = 0.01
-    beta = 1.0
-    c = 0.1
+def generate_obs_history(rng_key: random.KeyArray, K, M, N, sigma, beta):
+    weights = jnp.ones(K) / K
+    sigmas = sigma * jnp.ones((K, 2))
+    mus = jnp.array([[0.0, 0.0], [0.0, 1.0], [0.5, 0.5], [1.0, 0.0], [1.0, 1.0]])
 
+    return (
+        mus,
+        sigmas,
+        generate_behaviour_simple(rng_key, weights, mus, sigmas, M, N, beta=beta),
+    )
+
+
+def run_model_analysis(rng_key: random.KeyArray, args):
     model_names = [
         # "value functions known",
         # "value functions inferred (individual)",
@@ -150,8 +201,11 @@ def run_model_analysis(results_dir: str):
         "full bayesian",
     ]
 
+    _, _, obs_history = generate_obs_history(
+        rng_key, args.K, args.M, args.N, args.sigma, args.beta
+    )
     results, weights, phis, vselfs = analyse_model_effectiveness(
-        rng_key, model_names, M=M, N=N, K=K, sigma=sigma, beta=beta, c=c, plot_dir=results_dir
+        rng_key, model_names, obs_history, K=args.K, beta=args.beta, plot_dir=args.results_dir
     )
 
     for mn in model_names:
@@ -162,7 +216,40 @@ def run_model_analysis(results_dir: str):
             phis,
             vselfs,
             mn,
-            filename=f"{results_dir}/model_effectiveness_{key}.png",
+            filename=f"{args.results_dir}/model_effectiveness_{key}.png",
+        )
+
+
+def run_human_model_comparison(rng_key: random.KeyArray, args):
+    mus, _, obs_history = generate_obs_history(
+        rng_key, args.K, args.M, args.N, args.sigma, args.beta
+    )
+
+    phi_self = 0
+    target_phis = jnp.array([phi_self, args.K - 1])
+    v_self = mus[phi_self]
+
+    for strategy in ["indiscriminate", "ingroup bias", "full bayesian"]:
+        results = simulate_strategy(
+            rng_key=rng_key,
+            strategy=strategy,
+            obs_history=obs_history,
+            target_phis=target_phis,
+            v_self=v_self,
+            phi_self=phi_self,
+            beta=args.beta,
+            beta_self=args.beta_self,
+            repeats=1000,
+            ingroup_strength=0.75,
+            plot_dir=args.results_dir,
+        )
+
+        make_condition_barplots(
+            results,
+            flavour="binary",
+            plot_dir=args.results_dir,
+            filename=strategy,
+            format="png",
         )
 
 
@@ -188,29 +275,23 @@ def run_human_data_analysis():
     make_condition_barplots(data, flavour=flavour)
 
 
-def run_human_model_comparison():
-    for strategy in ["indiscriminate", "ingroup bias"]:
-        results = simulate_strategy(
-            agent_categories=jnp.array([0, 1]),
-            strategy=strategy,
-            beta=1,
-            repeats=1000,
-            own_cat=0,
-            ingroup_strength=0.75,
-        )
-        make_condition_barplots(results, flavour="binary", filename=strategy)
-
-
 def main():
+    args = parse_args()
+    print("Running with arguments:")
+    print(args)
+
+    # set random key for reproducibility
+    seed = int(time.time())
+    rng_key = random.PRNGKey(seed)
+    print(f"using seed {seed}")
+
     # define run name based on current date and time
     run_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    results_dir = f"results/{run_name}"
-    if not os.path.exists(results_dir):
-        os.makedirs(results_dir)
+    args.results_dir = f"results/{run_name}"
+    if not os.path.exists(args.results_dir):
+        os.makedirs(args.results_dir)
 
-    run_model_analysis(results_dir)
-    # run_human_data_analysis(results_dir)
-    # run_human_model_comparison(results_dir)
+    run_human_model_comparison(rng_key, args)
 
 
 if __name__ == "__main__":
