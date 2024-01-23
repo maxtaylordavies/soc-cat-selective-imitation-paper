@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pylab as pylab
 import matplotlib.pyplot as plt
 import seaborn as sns
+import seaborn.objects as so
 import pandas as pd
 
 sns.set_theme(context="paper", style="darkgrid")
@@ -13,50 +14,6 @@ pylab.rcParams.update(
         # "ytick.labelsize": "x-large",
     }
 )
-
-
-def make_condition_barplots(
-    data, flavour="binary", plot_dir="results/tmp", filename=None, format="svg"
-):
-    fig, axs = plt.subplots(3, 2, sharex=True, sharey=True, figsize=(8, 8))
-    for i, vis in enumerate([False, True]):
-        df = data[data["own_group_visible"] == vis]
-
-        tmp = df.loc[df["agents_known"] == True]
-        barplot(tmp, flavour=flavour, ax=axs[0, i], show_x_label=False, show_y_label=i == 0)
-
-        tmp = df.loc[(df["agents_known"] == False) & (df["groups_relevant"] == True)]
-        barplot(tmp, flavour=flavour, ax=axs[1, i], show_x_label=False, show_y_label=i == 0)
-
-        tmp = df.loc[(df["agents_known"] == False) & (df["groups_relevant"] == False)]
-        barplot(tmp, flavour=flavour, ax=axs[2, i], show_x_label=True, show_y_label=i == 0)
-
-    fig.tight_layout()
-
-    filename = filename or f"barplots_{flavour}"
-    fig.savefig(f"{plot_dir}/{filename}.{format}")
-
-
-def barplot(data, ax, flavour="binary", show_x_label=True, show_y_label=True):
-    if len(data) == 0:
-        return
-
-    # estimator = lambda x: sum(x) / len(x) if flavour == "binary" else "mean"
-    estimator = "mean"
-
-    x_label = "Agent" if show_x_label else ""
-    y_label = "Imitation" if show_y_label else ""
-
-    plot = sns.barplot(
-        data=data,
-        x="agent",
-        y=f"similarity",
-        palette=["#01C58A", "#1100D1"],
-        estimator=estimator,
-        ax=ax,
-    )
-    plot.axhline(0.5, ls="--", color="black")
-    plot.set(ylim=(0, 1), xlabel=x_label, ylabel=y_label)
 
 
 def surfaceplot(
@@ -92,7 +49,7 @@ def surfaceplot(
     fig.savefig(f"{filename}.{format}")
 
 
-def plot_model_effectiveness(data, weights, phis, vselfs, model_name, filename):
+def plot_strategy_performance(data, weights, phis, vselfs, model_name, filename):
     fig, axs = plt.subplots(3, len(vselfs), figsize=(12, 8), sharex=False, sharey="row")
     palette = sns.color_palette("viridis", n_colors=len(phis))
 
@@ -172,3 +129,82 @@ def plot_model_effectiveness(data, weights, phis, vselfs, model_name, filename):
     fig.suptitle(model_name, fontsize=16)
     fig.tight_layout()
     fig.savefig(filename)
+
+
+def make_condition_barplots(
+    data, flavour="binary", plot_dir="results/tmp", filename=None, formats=["svg"]
+):
+    forbidden_combinations = {
+        (True, "arbitrary"),  # (groups relevant, own group label)
+        (False, "matched"),
+        (False, "mismatched"),
+    }
+
+    fig, axs = plt.subplots(2, 4, sharex=True, sharey=True, figsize=(16, 8))
+    for col, own_group in enumerate(["hidden", "arbitrary", "matched", "mismatched"]):
+        df = data[data["own group label"] == own_group]
+
+        # tmp = df.loc[df["agents known"] == True]
+        # barplot(tmp, flavour=flavour, ax=axs[0, i], legend=i == 0)
+
+        df = df.loc[df["agents known"] == False]
+        for row, groups_relevant in enumerate([False, True]):
+            tmp = df.loc[df["groups relevant"] == groups_relevant]
+            if (groups_relevant, own_group) in forbidden_combinations:
+                continue
+            barplot(tmp, flavour=flavour, ax=axs[row, col])
+
+    fig.tight_layout()
+    for fmt in formats:
+        filename = filename or f"barplots"
+        fig.savefig(f"{plot_dir}/{filename}.{fmt}")
+
+
+def barplot_stacked(data, ax, flavour="binary", show_x_label=False, show_y_label=False):
+    if len(data) == 0:
+        return
+
+    so.Plot(
+        data=data,
+        x="strategy",
+        y="imitation",
+        color="same group",
+        # palette=["#01C58A", "#1100D1"],
+        # ax=ax,
+    ).add(so.Bar(), so.Agg("sum"), so.Norm(func="sum", by=["x"]), so.Stack()).scale(
+        color=["#01C58A", "#1100D1"]
+    ).on(
+        ax
+    ).plot()
+
+    ax.axhline(0.5, ls="--", color="black")
+
+    x_label = "Strategy" if show_x_label else ""
+    y_label = "% imitation agent 1" if show_y_label else ""
+    ax.set(ylim=(0, 1), xlabel=x_label, ylabel=y_label)
+
+
+def barplot(
+    data, ax, flavour="binary", show_x_label=False, show_y_label=False, legend=False
+):
+    if len(data) == 0:
+        return
+
+    # estimator = lambda x: sum(x) / len(x) if flavour == "binary" else "mean"
+    estimator = lambda x: 100 * sum(x) / len(x) if len(x) > 0 else 0
+
+    x_label = "Strategy" if show_x_label else ""
+    y_label = "% imitation agent 1" if show_y_label else ""
+
+    plot = sns.barplot(
+        data,
+        x="strategy",
+        hue="group",
+        y=f"imitation",
+        palette=["#01C58A", "#1100D1"],
+        estimator=estimator,
+        ax=ax,
+        legend=legend,
+    )
+    plot.axhline(50, ls="--", color="black")
+    plot.set(ylim=(0, 100), xlabel=x_label, ylabel=y_label)

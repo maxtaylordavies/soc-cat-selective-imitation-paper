@@ -78,20 +78,20 @@ def visualise_trajectory(traj):
     return grid
 
 
-def simulate_imitation_old(rng_key, vself, vm, c=0.1, beta=0.01, trials=10000, level="traj"):
+def simulate_imitation_old(rng_key, vself, vm, start_locs, c=0.1, beta=0.01):
     vself_ = item_values(vx=float(vself[0]), vy=float(vself[1]))
     vm_ = item_values(vx=float(vm[0]), vy=float(vm[1]))
-    V = compute_state_values(vm_, c)
+    # V = compute_state_values(vm_, c)
 
-    rewards, proportions = np.zeros(trials), np.zeros(trials)
+    rewards = np.zeros(len(start_locs))
+    keys = random.split(rng_key, len(start_locs))
 
     # generate trajectory choices from random starting locations
-    for i, start in enumerate(random_locs(rng_key, trials)):
-        _, traj = simulate_trajectory(rng_key, vm_, start, c=c, beta=beta, level=level, V=V)
+    for i, start in enumerate(start_locs):
+        _, traj = simulate_trajectory(keys[0], vm_, start, c=c, beta=beta)
         rewards[i] = traj_reward(traj, vself_, c)
-        proportions[i] = traj_reward(traj, vm_, c) / V[start[0], start[1]]
 
-    return np.mean(rewards), np.mean(proportions)
+    return np.mean(rewards)
 
 
 def simulate_imitation(vself, choices):

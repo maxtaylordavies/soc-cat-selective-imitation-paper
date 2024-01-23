@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 import os
 
+import jax
 from jax import random
 import jax.numpy as jnp
 import pandas as pd
@@ -12,162 +13,119 @@ from src.utils import (
     load_sessions,
     save_responses,
     generate_bonus_file,
-    make_condition_barplots,
-    plot_model_effectiveness,
+    plot_strategy_performance,
     surfaceplot,
     value_similarity,
+    make_condition_barplots,
 )
 from src.human import analyse_sessions
 from src.modelling import (
+    simulate_choices,
     simulate_strategy,
     simulate_imitation,
-    analyse_model_effectiveness,
+    simulate_imitation_old,
+    analyse_strategy_performance,
     generate_behaviour_simple,
+    analyse_strategy_humanlikeness,
+    random_locs,
+)
+from src.modelling.strategies import (
+    indiscriminate,
+    ingroup_bias,
+    individual_inference,
+    groups_inference,
 )
 
+EXPERIMENT_IDS = [
+    "prolific-test-2",
+    "prolific-test-3",
+    "prolific-test-4",
+    "prolific-test-5",
+    "prolific-test-6",
+    "prolific-test-7",
+    "prolific-test-8",
+]
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--M",
-        type=int,
-        default=500,
-    )
-    parser.add_argument(
-        "--N",
-        type=int,
-        default=1000,
-    )
-    parser.add_argument(
-        "--K",
-        type=int,
-        default=5,
-    )
-    parser.add_argument(
-        "--sigma",
-        type=float,
-        default=0.01,
-    )
-    parser.add_argument(
-        "--beta",
-        type=float,
-        default=0.5,
-    )
-    parser.add_argument(
-        "--beta-self",
-        type=float,
-        default=0.1,
-    )
-    parser.add_argument(
-        "--c",
-        type=float,
-        default=0.1,
-    )
-    return parser.parse_args()
+STRATEGY_DICT = {
+    "individual inference": individual_inference,
+    "ingroup bias": ingroup_bias,
+    "groups inference": groups_inference,
+}
 
 
-def run_preliminary_simulations():
-    def make_surface_plots(data, betas, folder):
-        if not os.path.exists(f"results/{folder}"):
-            os.makedirs(f"results/{folder}")
+def run_preliminary_simulations(rng_key):
+    def make_surface_plots(data, betas, filename):
+        if not os.path.exists(f"results/surfaces"):
+            os.makedirs(f"results/surfaces")
 
         for fmt in ["svg", "pdf"]:
-            for level in data["level"].unique():
-                d = data[data["level"] == level]
+            # surfaceplot(
+            #     d[d["beta"] == jnp.log10(betas[0])],
+            #     ["sim_x", "sim_y", "reward"],
+            #     ["Value similarity (x)", "Value similarity (y)", "Average reward"],
+            #     filename=f"results/{folder}/surface_{level}_sim",
+            #     format=fmt,
+            # )
+            surfaceplot(
+                data,
+                ["sim", "beta", "reward"],
+                ["Value similarity (combined)", "Decision noise", "Average reward"],
+                ticks={"y": [jnp.log10(b) for b in betas]},
+                ticklabels={"y": [str(b) for b in betas]},
+                filename=f"results/surfaces/{filename}",
+                format=fmt,
+            )
 
-                # surfaceplot(
-                #     d[d["beta"] == jnp.log10(betas[0])],
-                #     ["sim_x", "sim_y", "reward"],
-                #     ["Value similarity (x)", "Value similarity (y)", "Average reward"],
-                #     filename=f"results/{folder}/surface_{level}_sim",
-                #     format=fmt,
-                # )
-
-                surfaceplot(
-                    d,
-                    ["sim", "beta", "reward"],
-                    ["Value similarity (combined)", "Decision noise", "Average reward"],
-                    ticks={"y": [jnp.log10(b) for b in betas]},
-                    ticklabels={"y": [str(b) for b in betas]},
-                    filename=f"results/{folder}/surface_{level}_beta",
-                    format=fmt,
-                )
-
-                # surfaceplot(
-                #     data[data["level"] == level],
-                #     ["similarity", "competence", "reward"],
-                #     ["Value similarity", "Competence", "Average reward"],
-                #     filename=f"{folder}/surface_{level}_competence",
-                #     format=fmt,
-                # )
-
-    c = 0.05
+    c = 0.1
     betas = [0.01, 0.1, 1, 10, 100]
     trials = 1000
 
-    # 1-dimensional case
-    vself = jnp.array([1])
+    data = {
+        "sim_x": [],
+        "sim_y": [],
+        "sim": [],
+        "beta": [],
+        "reward": [],
+        "vself_idx": [],
+    }
 
-    data = {"sim": [], "beta": [], "competence": [], "reward": [], "level": []}
-    for vm in tqdm([jnp.array([v]) for v in jnp.linspace(0, 1, 11)]):
-        for beta in betas:
-            for level in ["traj"]:
-                reward, proportion = simulate_imitation(
-                    vself, vm, c, beta, level=level, trials=trials
+    vselfs = jnp.array(
+        [
+            # [0, 0],
+            [0, 1],
+            # [1, 0],
+            # [1, 1],
+            # [1, 0.5],
+            # [0.5, 1],
+        ]
+    )
+
+    n = 5
+    vms = jnp.array(
+        [[vx, vy] for vx in jnp.linspace(0, 1, n) for vy in jnp.linspace(0, 1, n)]
+    )
+    start_locs = random_locs(rng_key, trials)
+
+    for i, vself in enumerate(vselfs):
+        for vm in tqdm(vms, desc=f"vself {i + 1}/{len(vselfs)}"):
+            for beta in betas:
+                reward = simulate_imitation_old(
+                    rng_key, vself, vm, start_locs, c=c, beta=beta
                 )
+                sims, combined = value_similarity(vself, vm)
+                data["sim_x"].append(sims[0])
+                data["sim_y"].append(sims[1])
+                data["sim"].append(combined)
                 data["reward"].append(reward)
-                data["competence"].append(proportion)
-                data["sim"].append(value_similarity(vself, vm))
                 data["beta"].append(jnp.log10(beta))
-                data["level"].append(level)
+                data["vself_idx"].append(i)
 
     data = pd.DataFrame(data)
-    make_surface_plots(data, betas, "1d")
 
-    # # 2-dimensional case
-
-    # data = {
-    #     "sim_x": [],
-    #     "sim_y": [],
-    #     "sim": [],
-    #     "beta": [],
-    #     "competence": [],
-    #     "reward": [],
-    #     "level": [],
-    #     "vself_idx": [],
-    # }
-
-    # vselfs = [
-    #     jnp.array([0, 1]),
-    #     jnp.array([1, 0]),
-    #     jnp.array([1, 0.5]),
-    #     jnp.array([0.5, 1]),
-    # ]
-
-    # for i, vself in enumerate(vselfs):
-    #     for vx in tqdm(jnp.linspace(0, 1, 11)):
-    #         for vy in jnp.linspace(0, 1, 11):
-    #             vm = jnp.array([vx, vy])
-    #             for beta in betas:
-    #                 for level in ["traj", "step"]:
-    #                     reward, proportion = simulate_imitation(
-    #                         vself, vm, c, beta, level=level, trials=trials
-    #                     )
-    #                     sims, combined = value_similarity(vself, vm)
-    #                     data["sim_x"].append(sims[0])
-    #                     data["sim_y"].append(sims[1])
-    #                     data["sim"].append(combined)
-    #                     data["reward"].append(reward)
-    #                     data["beta"].append(jnp.log10(beta))
-    #                     data["competence"].append(proportion)
-    #                     data["level"].append(level)
-    #                     data["vself_idx"].append(i)
-
-    # data = pd.DataFrame(data)
-
-    # for i, vself in enumerate(vselfs):
-    #     d = data[data["vself_idx"] == i]
-    #     make_surface_plots(d, betas, f"2d/step/{i}")
+    for i, vself in enumerate(vselfs):
+        d = data[data["vself_idx"] == i]
+        make_surface_plots(d, betas, i)
+    make_surface_plots(data, betas, "combined")
 
     # for fmt in ["svg", "pdf"]:
     #     surfaceplot(
@@ -176,114 +134,68 @@ def run_preliminary_simulations():
     #         ["Value similarity (combined)", "Decision noise", "Average reward"],
     #         ticks={"y": [jnp.log10(b) for b in betas]},
     #         ticklabels={"y": [str(b) for b in betas]},
-    #         filename=f"results/2d/surface_{level}_beta",
+    #         filename=f"results/surfaces",
     #         format=fmt,
     #     )
 
 
-def generate_obs_history(rng_key: random.KeyArray, K, M, N, sigma, beta):
+def generate_obs_history(rng_key: jax.Array, mus: jnp.array, args):
+    K = mus.shape[0]
     weights = jnp.ones(K) / K
-    sigmas = sigma * jnp.ones((K, 2))
-    mus = jnp.array([[0.0, 0.0], [0.0, 1.0], [0.5, 0.5], [1.0, 0.0], [1.0, 1.0]])
-
-    return (
-        mus,
-        sigmas,
-        generate_behaviour_simple(rng_key, weights, mus, sigmas, M, N, beta=beta),
+    sigmas = args.sigma * jnp.ones((K, 2))
+    behaviour = generate_behaviour_simple(
+        rng_key, weights, mus, sigmas, args.M, args.N, beta=args.beta
     )
+    return mus, sigmas, behaviour
 
 
-def run_model_analysis(rng_key: random.KeyArray, args):
-    model_names = [
-        # "value functions known",
-        # "value functions inferred (individual)",
-        # "value functions inferred (group)",
-        "full bayesian",
-    ]
-
-    _, _, obs_history = generate_obs_history(
-        rng_key, args.K, args.M, args.N, args.sigma, args.beta
-    )
-    results, weights, phis, vselfs = analyse_model_effectiveness(
-        rng_key, model_names, obs_history, K=args.K, beta=args.beta, plot_dir=args.results_dir
-    )
-
-    for mn in model_names:
-        key = mn.replace(" ", "_")
-        plot_model_effectiveness(
-            results,
-            weights,
-            phis,
-            vselfs,
-            mn,
-            filename=f"{args.results_dir}/model_effectiveness_{key}.png",
+def setup():
+    def parse_args():
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--M",
+            type=int,
+            default=500,
         )
-
-
-def run_human_model_comparison(rng_key: random.KeyArray, args):
-    mus, _, obs_history = generate_obs_history(
-        rng_key, args.K, args.M, args.N, args.sigma, args.beta
-    )
-
-    phi_self = 0
-    target_phis = jnp.array([phi_self, args.K - 1])
-    v_self = mus[phi_self]
-
-    for strategy in ["indiscriminate", "ingroup bias", "full bayesian"]:
-        results = simulate_strategy(
-            rng_key=rng_key,
-            strategy=strategy,
-            obs_history=obs_history,
-            target_phis=target_phis,
-            v_self=v_self,
-            phi_self=phi_self,
-            beta=args.beta,
-            beta_self=args.beta_self,
-            repeats=1000,
-            ingroup_strength=0.75,
-            plot_dir=args.results_dir,
+        parser.add_argument(
+            "--N",
+            type=int,
+            default=1000,
         )
-
-        make_condition_barplots(
-            results,
-            flavour="binary",
-            plot_dir=args.results_dir,
-            filename=strategy,
-            format="png",
+        parser.add_argument(
+            "--K",
+            type=int,
+            default=5,
         )
-
-
-def run_human_data_analysis():
-    filters = {
-        "experimentId": [
-            "prolific-test-2",
-            "prolific-test-3",
-            "prolific-test-4",
-            "prolific-test-5",
-            "prolific-test-6",
-            "prolific-test-7",
-            "prolific-test-8",
-        ],
-    }
-    sessions = load_sessions(filters)
-
-    generate_bonus_file(sessions, "bonuses.txt")
-    save_responses(sessions, f"../results/responses.txt")
-
-    flavour = "binary"
-    data = analyse_sessions(sessions, flavour=flavour)
-    make_condition_barplots(data, flavour=flavour)
-
-
-def main():
-    args = parse_args()
-    print("Running with arguments:")
-    print(args)
+        parser.add_argument(
+            "--sigma",
+            type=float,
+            default=0.01,
+        )
+        parser.add_argument(
+            "--beta",
+            type=float,
+            default=0.5,
+        )
+        parser.add_argument(
+            "--beta-self",
+            type=float,
+            default=0.5,
+        )
+        parser.add_argument(
+            "--c",
+            type=float,
+            default=0.1,
+        )
+        return parser.parse_args()
 
     # set random key for reproducibility
     seed = int(time.time())
     rng_key = random.PRNGKey(seed)
     print(f"using seed {seed}")
+
+    # parse any command line arguments
+    args = parse_args()
 
     # define run name based on current date and time
     run_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -291,8 +203,83 @@ def main():
     if not os.path.exists(args.results_dir):
         os.makedirs(args.results_dir)
 
-    run_human_model_comparison(rng_key, args)
+    print("Running with arguments:")
+    print(args)
+
+    return rng_key, args
 
 
-if __name__ == "__main__":
-    main()
+rng_key, args = setup()
+
+# # load human experiment data
+# filters = {"experimentId": EXPERIMENT_IDS}
+# sessions = load_sessions(filters)
+
+# generate_bonus_file(sessions, "bonuses.txt")
+# save_responses(sessions, f"../results/responses.txt")
+
+# # analyse human experiment data
+# human_data = analyse_sessions(sessions)
+# make_condition_barplots(human_data)
+
+# analyse strategy performance
+# _, _, obs_history = generate_obs_history(
+#     rng_key, args.K, args.M, args.N, args.sigma, args.beta
+# )
+# results, weights, phis, vselfs = analyse_strategy_performance(
+#     rng_key,
+#     STRATEGY_DICT,
+#     obs_history,
+#     K=args.K,
+#     beta=args.beta,
+#     plot_dir=args.results_dir,
+# )
+# for name in STRATEGY_DICT.keys():
+#     key = name.replace(" ", "_")
+#     plot_strategy_performance(
+#         results,
+#         weights,
+#         phis,
+#         vselfs,
+#         name,
+#         filename=f"{args.results_dir}/strategy_performance_{key}.png",
+#     )
+
+# compare strategies to human data
+mus = jnp.array([[0, 0.5], [1, 0.5]])
+_, _, obs_history = generate_obs_history(rng_key, mus, args)
+results = pd.DataFrame(
+    {
+        "group": [],
+        "imitation": [],
+        "agents known": [],
+        "groups relevant": [],
+        "own group label": [],
+        "strategy": [],
+    }
+)
+for name, strat in STRATEGY_DICT.items():
+    results = analyse_strategy_humanlikeness(
+        rng_key, obs_history, results, strat, name, args
+    )
+
+# human_data["strategy"] = "human"
+# results = pd.concat([results, human_data])
+
+# temporary hack
+tmp = pd.DataFrame(
+    {
+        "group": [0, 0, 0],
+        "imitation": [0, 0, 0],
+        "agents known": [True, False, False],
+        "groups relevant": [True, True, False],
+        "own group label": ["mismatched", "mismatched", "mismatched"],
+        "strategy": ["human", "human", "human"],
+    }
+)
+results = pd.concat([results, tmp])
+results["group"] = results["group"].astype(int)
+
+make_condition_barplots(
+    results, plot_dir=args.results_dir, filename="barplots", formats=["png", "svg"]
+)

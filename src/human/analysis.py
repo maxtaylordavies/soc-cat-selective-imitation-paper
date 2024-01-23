@@ -135,10 +135,10 @@ def analyse_trajectory_dict(td, flavour="binary"):
 def analyse_sessions(sessions, flavour="binary"):
     results = {
         "agent": [],
-        "similarity": [],
-        "agents_known": [],
-        "own_group_visible": [],
-        "groups_relevant": [],
+        "imitation": [],
+        "agents known": [],
+        "own group label": [],
+        "groups relevant": [],
     }
 
     for s in sessions:
@@ -148,17 +148,17 @@ def analyse_sessions(sessions, flavour="binary"):
                 continue
 
             agents_known = phase_idx == 2
-            own_group_visible = s["conditions"]["phi"] > -1
+            own_group_label = "visible" if s["conditions"]["phi"] > -1 else "hidden"
             groups_relevant = s["conditions"]["correlation"] == 0
 
             tmp = analyse_trajectory_dict(d, flavour=flavour)
 
-            for a in [1, 2]:
-                vals = tmp[f"sim_{a}"]
-                results["agent"].extend([f"agent {a}"] * len(vals))
-                results["similarity"].extend(vals)
-                results["agents_known"].extend([agents_known] * len(vals))
-                results["own_group_visible"].extend([own_group_visible] * len(vals))
-                results["groups_relevant"].extend([groups_relevant] * len(vals))
+            for a in [0, 1]:
+                vals = tmp[f"sim_{a + 1}"]
+                results["agent"].extend([a] * len(vals))
+                results["imitation"].extend(vals)
+                results["agents known"].extend([agents_known] * len(vals))
+                results["own group label"].extend([own_group_label] * len(vals))
+                results["groups relevant"].extend([groups_relevant] * len(vals))
 
     return pd.DataFrame(results)

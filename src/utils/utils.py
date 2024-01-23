@@ -73,7 +73,7 @@ def value_similarity(vself, v):
     weights = jnp.abs(vself - 0.5)
     if jnp.sum(weights) == 0:
         return 0
-    return jnp.sum(sims * norm_unit_sum(weights))
+    return sims, jnp.sum(sims * norm_unit_sum(weights))
 
 
 def mean_pool_1d(x: jnp.ndarray, pool_size: int):
@@ -96,5 +96,6 @@ def mean_pool_2d(x: jnp.ndarray, pool_size: int):
 
 def v_domain_2d(low=-0.5, high=1.5, bins=100):
     return jnp.stack(
-        jnp.meshgrid(jnp.linspace(low, high, bins), jnp.linspace(low, high, bins)), axis=-1
+        jnp.meshgrid(jnp.linspace(low, high, bins), jnp.linspace(low, high, bins)),
+        axis=-1,
     ).reshape((-1, 2))

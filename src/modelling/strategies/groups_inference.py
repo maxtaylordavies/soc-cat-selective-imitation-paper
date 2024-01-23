@@ -25,63 +25,58 @@ def stickbreak(betas):
     return one_betas * c_one
 
 
-@config_enumerate
-def gmm(data):
-    choices, phis, K, beta = data
-    choices_per_agent = jnp.sum(choices[0])
+def visualise_group_parameters(rng_key, mus, sigmas, fpath, num_samples=1000):
+    K, data = len(mus), []
+    for k in range(K):
+        cov = jnp.diag(sigmas[k])
+        points = random.multivariate_normal(rng_key, mus[k], cov, shape=(num_samples,))
+        data.extend([{"v1": float(p[0]), "v2": float(p[1]), "k": k} for p in points])
+    data = pd.DataFrame(data)
 
-    # global variables
-    weights = numpyro.sample("weights", dist.Dirichlet(jnp.ones(K) / K))
-    with numpyro.plate("components", K):
-        # sample mixture component means from a normal distribution
-        mu = numpyro.sample(
-            "mu", dist.MultivariateNormal(jnp.zeros(2) + 0.5, 0.1 * jnp.eye(2))
+    fig, ax = plt.subplots()
+    g = sns.kdeplot(
+        data=data,
+        x="v1",
+        y="v2",
+        hue="k",
+        fill=True,
+        palette=sns.color_palette("viridis", n_colors=K),
+        levels=4,
+        legend=False,
+        ax=ax,
+    )
+    g.set(xlim=(-0.5, 1.5), ylim=(-0.5, 1.5))
+    fig.savefig(fpath)
+
+
+def visualise_conditional_posterior(
+    rng_key, v_domain, posterior, fpath, num_samples=250
+):
+    data = []
+    num_phis = posterior.shape[0]
+    for phi in range(num_phis):
+        sample_idxs = random.choice(
+            rng_key, len(v_domain), shape=(num_samples,), p=posterior[phi]
+        )
+        samples = v_domain[sample_idxs]
+        data.extend(
+            [{"v1": float(v[0]), "v2": float(v[1]), "phi": int(phi)} for v in samples]
         )
 
-        # sample covariance matrices. each component's covariance matrix is
-        # diagonal, where the diagonal entries are distributed according to
-        # an inverse gamma distribution.
-        sigma1 = numpyro.sample("sigma1", dist.InverseGamma(0.5))
-        sigma2 = numpyro.sample("sigma2", dist.InverseGamma(0.5))
-
-        # sigma1 has shape (K,) and sigma2 has shape (K,), where sigma1[K] and sigma2[K]
-        # are the diagonal entries of the covariance matrix for component K. now we use these
-        # to construct the covariance matrix for each component. First we create a Kx2 matrix sigma,
-        # where sigma[K, :] is the diagonal entries of the covariance matrix for component K.
-        # Then we create a Kx2x2 matrix cov, where cov[K, :, :] is the covariance matrix for component K.
-        sigmas = jnp.stack([sigma1, sigma2], axis=1)
-        covs = jnp.stack([jnp.diag(s) for s in sigmas], axis=0)
-
-        # each agent also expresses a discrete scalar 'surface feature', that may help identify their
-        # latent group membership. we assume that this feature is distributed according to a categorical
-        # distribution with K categories - each group has a different set of weights that parameterises the
-        # categorical distribution.
-        phi_weights = numpyro.sample("phi_weights", dist.Dirichlet(jnp.ones(K) / K))
-
-    with numpyro.plate("agents", len(choices)):
-        # sample group assignments
-        z = numpyro.sample("z", dist.Categorical(weights))
-
-        # sample a surface feature for each agent according to the sampled group assignments
-        numpyro.sample("phi", dist.Categorical(phi_weights[z]), obs=phis)
-
-        # sample a value function for each agent according to the sampled group assignments,
-        # and convert each value function into a probability distribution over the four items
-        v = numpyro.sample("v", dist.MultivariateNormal(mu[z], covs[z]))
-        v_ = jnp.stack(item_values(v[..., 0], v[..., 1], as_dict=False), axis=-1)
-        p = jnp.exp(v_ / beta)
-        p /= jnp.sum(p, axis=-1, keepdims=True)
-
-        # choices contains the empirical choice proportions for each agent
-        # we can compute their log likelihood under a multinomial distribution
-        log_likelihood = dist.Multinomial(probs=p, total_count=choices_per_agent).log_prob(
-            choices
-        )
-
-        numpyro.factor(
-            "obs",
-            log_likelihood,
-        )
+    fig, ax = plt.subplots()
+    g = sns.kdeplot(
+        data=pd.DataFrame(data),
+        x="v1",
+        y="v2",
+        hue="phi",
+        fill=True,
+        palette=sns.color_palette("viridis", n_colors=num_phis),
+        levels=4,
+        legend=False,
+        ax=ax,
+    )
+    g.set(xlim=(-0.5, 1.5), ylim=(-0.5, 1.5))
+    fig.savefig(fpath)
 
 
 @config_enumerate
@@ -138,9 +133,9 @@ def dpmm(data):
 
         # choices contains the empirical choice proportions for each agent
         # we can compute their log likelihood under a multinomial distribution
-        choices_log_prob = dist.Multinomial(probs=p, total_count=choices_per_agent).log_prob(
-            choices
-        )
+        choices_log_prob = dist.Multinomial(
+            probs=p, total_count=choices_per_agent
+        ).log_prob(choices)
 
         numpyro.factor(
             "obs",
@@ -154,7 +149,7 @@ def infer_conditional_v_distributions(
     v_domain,
     intermediate_plots=False,
     plot_dir="results/tmp",
-    init_iter=200,
+    init_iter=100,
     run_iter=1000,
 ):
     _, phis, _ = data
@@ -169,7 +164,8 @@ def infer_conditional_v_distributions(
         ),
         "sigma1": 0.5 * jnp.ones(max_num_clusters),
         "sigma2": 0.5 * jnp.ones(max_num_clusters),
-        "phi_weights": jnp.ones((max_num_clusters, max_num_clusters)) / max_num_clusters,
+        "phi_weights": jnp.ones((max_num_clusters, max_num_clusters))
+        / max_num_clusters,
     }
 
     # run SVI
@@ -227,9 +223,6 @@ def infer_conditional_v_distributions(
     phi_to_k = phi_weights.T[jnp.unique(phis)] * mixture_weights
     phi_to_k /= jnp.sum(phi_to_k, axis=-1, keepdims=True)
 
-    print("phi_to_k:")
-    print(phi_to_k)
-
     phi_probs = jnp.zeros((len(phi_to_k), len(v_domain)))
     for phi in range(len(phi_to_k)):
         weighted = phi_to_k[phi].reshape((-1, 1)) * group_probs
@@ -239,13 +232,23 @@ def infer_conditional_v_distributions(
     return phi_probs
 
 
-def full_bayesian(rng_key, agents, beta, v_self, v_domain, plot_dir):
-    phis = jnp.unique(jnp.array([a["phi"] for a in agents]))
-    weights = jnp.zeros(len(phis))
+def groups_inference(
+    rng_key,
+    obs_history,
+    new_obs,
+    beta,
+    v_self,
+    v_domain,
+    phi_self,
+    ingroup_strength,
+    **kwargs,
+):
+    if new_obs[0]["phi"] is None:
+        return jnp.ones(len(new_obs)) / len(new_obs)
 
-    choice_counts = jnp.zeros((len(agents), 4))
-    _phis = jnp.zeros(len(agents), dtype=int)
-    for m, a in enumerate(agents):
+    choice_counts = jnp.zeros((len(obs_history), 4))
+    _phis = jnp.zeros(len(obs_history), dtype=int)
+    for m, a in enumerate(obs_history):
         tmp = jnp.array(a["choices"])
         choice_counts = choice_counts.at[m].set(jnp.bincount(tmp, minlength=4))
         _phis = _phis.at[m].set(a["phi"])
@@ -255,66 +258,16 @@ def full_bayesian(rng_key, agents, beta, v_self, v_domain, plot_dir):
         data=(choice_counts, _phis, beta),
         v_domain=v_domain,
         intermediate_plots=False,
-        plot_dir=plot_dir,
     )
 
-    visualise_conditional_posterior(rng_key, v_domain, posterior, f"{plot_dir}/posterior.png")
+    sims = jnp.array([value_similarity(v_self, v)[1] for v in v_domain])
+    target_phis = jnp.array(sorted([a["phi"] for a in new_obs]))
+    all_phis = jnp.unique(_phis)
+    weights = jnp.zeros(len(target_phis))
 
-    sims = jnp.array([value_similarity(v_self, v) for v in v_domain])
-    for i, phi in enumerate(phis):
-        expected_sim = jnp.sum(sims * posterior[i])
+    for i, phi in enumerate(target_phis):
+        j = int(jnp.where(all_phis == phi)[0][0])
+        expected_sim = jnp.sum(sims * posterior[j])
         weights = weights.at[i].set(expected_sim)
 
     return norm_unit_sum(weights)
-
-
-def visualise_group_parameters(rng_key, mus, sigmas, fpath, num_samples=1000):
-    K, data = len(mus), []
-    for k in range(K):
-        cov = jnp.diag(sigmas[k])
-        points = random.multivariate_normal(rng_key, mus[k], cov, shape=(num_samples,))
-        data.extend([{"v1": float(p[0]), "v2": float(p[1]), "k": k} for p in points])
-    data = pd.DataFrame(data)
-
-    fig, ax = plt.subplots()
-    g = sns.kdeplot(
-        data=data,
-        x="v1",
-        y="v2",
-        hue="k",
-        fill=True,
-        palette=sns.color_palette("viridis", n_colors=K),
-        levels=4,
-        legend=False,
-        ax=ax,
-    )
-    g.set(xlim=(-0.5, 1.5), ylim=(-0.5, 1.5))
-    fig.savefig(fpath)
-
-
-def visualise_conditional_posterior(rng_key, v_domain, posterior, fpath, num_samples=250):
-    data = []
-    num_phis = posterior.shape[0]
-    for phi in range(num_phis):
-        sample_idxs = random.choice(
-            rng_key, len(v_domain), shape=(num_samples,), p=posterior[phi]
-        )
-        samples = v_domain[sample_idxs]
-        data.extend(
-            [{"v1": float(v[0]), "v2": float(v[1]), "phi": int(phi)} for v in samples]
-        )
-
-    fig, ax = plt.subplots()
-    g = sns.kdeplot(
-        data=pd.DataFrame(data),
-        x="v1",
-        y="v2",
-        hue="phi",
-        fill=True,
-        palette=sns.color_palette("viridis", n_colors=num_phis),
-        levels=4,
-        legend=False,
-        ax=ax,
-    )
-    g.set(xlim=(-0.5, 1.5), ylim=(-0.5, 1.5))
-    fig.savefig(fpath)

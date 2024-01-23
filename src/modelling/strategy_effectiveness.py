@@ -4,20 +4,13 @@ from tqdm import tqdm
 import pandas as pd
 
 from .preliminary import simulate_choices, simulate_trajectories, simulate_imitation
-from .weighting_functions.explicit_value_functions import value_funcs_known
-from .weighting_functions.full_bayesian import full_bayesian
+from .strategies.groups_inference import groups_inference
 from ..utils import v_domain_2d
 
 
-MODELS = {
-    "value functions known": value_funcs_known,
-    "full bayesian": full_bayesian,
-}
-
-
-def analyse_model_effectiveness(
+def analyse_strategy_performance(
     rng_key,
-    model_names,
+    strategy_dict,
     obs_history,
     K=5,
     beta=0.1,
@@ -35,7 +28,7 @@ def analyse_model_effectiveness(
     v_domain = v_domain_2d()
 
     imitation_results = {"phi": [], "vx": [], "vy": [], "reward": [], "vself": []}
-    weights = {model_name: [] for model_name in model_names}
+    weights = {name: [] for name in strategy_dict.keys()}
 
     for i, v_self in enumerate(v_selfs):
         # simulate imitating each agent
@@ -48,11 +41,9 @@ def analyse_model_effectiveness(
             imitation_results["vself"].append(i)
 
         # compute weights
-        for model_name in model_names:
-            weights[model_name].append(
-                MODELS[model_name](
-                    rng_key, obs_history, beta, v_self, v_domain, plot_dir=plot_dir
-                )
+        for name, strategy in strategy_dict.items():
+            weights[name].append(
+                strategy(rng_key, obs_history, beta, v_self, v_domain, plot_dir=plot_dir)
             )
 
     return pd.DataFrame(imitation_results), weights, phis, v_selfs

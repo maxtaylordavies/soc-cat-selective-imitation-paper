@@ -1,3 +1,3 @@
-from .model_humanlikeness import *
-from .model_effectiveness import *
+from .strategy_humanlikeness import *
+from .strategy_effectiveness import *
 from .preliminary import *
