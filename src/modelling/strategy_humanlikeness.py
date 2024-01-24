@@ -1,3 +1,6 @@
+import argparse
+from copy import deepcopy
+
 from jax import random
 import jax.numpy as jnp
 import pandas as pd
@@ -34,10 +37,7 @@ def simulate_strategy(
     new_obs: list[dict],
     v_self: jnp.ndarray,
     phi_self: int,
-    ingroup_strength: float,
-    beta: float,
-    beta_self: float,
-    repeats: int,
+    args: argparse.Namespace,
     **kwargs,
 ):
     df = pd.DataFrame(
@@ -49,63 +49,64 @@ def simulate_strategy(
     )
 
     for ogl in ["hidden", "arbitrary", "matched", "mismatched"]:
+        obs_hist = deepcopy(obs_history)
+        obs_new = deepcopy(new_obs)
         _phi_self = None if ogl == "hidden" else phi_self
         if ogl == "mismatched":
-            for i, a in enumerate(obs_history):
-                obs_history[i]["phi"] = 1 - a["phi"]
-            for i, a in enumerate(new_obs):
-                new_obs[i]["phi"] = 1 - a["phi"]
+            for i, a in enumerate(obs_hist):
+                if a["phi"] is not None:
+                    obs_hist[i]["phi"] = 1 - a["phi"]
+            for i, a in enumerate(obs_new):
+                if a["phi"] is not None:
+                    obs_new[i]["phi"] = 1 - a["phi"]
 
         weights = strategy(
             rng_key,
-            obs_history,
-            new_obs,
-            beta,
+            obs_hist,
+            obs_new,
+            args.beta,
             v_self,
             v_domain_2d(),
             _phi_self,
-            ingroup_strength,
+            args.ingroup_strength,
             **kwargs,
         )
+
         results = simulate_imitation_choices(
             rng_key,
             weights,
-            beta_self,
-            repeats,
+            args.beta_self,
+            args.N,
         )
-
         results["own group label"] = ogl
         df = pd.concat([df, results])
     return df
 
 
 def analyse_strategy_humanlikeness(
-    rng_key, obs_history, results, strat, strat_name, args, **kwargs
+    rng_key, agent_vs, obs_history, results, strat, strat_name, args, **kwargs
 ):
-    # # agents known
-    v_self = jnp.array([0.0, 0.5])
-    # new_obs = []
-    # for m in range(2):
-    #     choices = simulate_choices(rng_key, agent_vs[m], beta=beta, N=N)
-    #     new_obs.append({"phi": None, "choices": choices})
+    # agents known
+    if not "group" in strat_name:
+        new_obs = []
+        for m in range(2):
+            choices = simulate_choices(rng_key, agent_vs[m], beta=args.beta, N=args.N)
+            new_obs.append({"phi": None, "choices": choices})
 
-    # tmp = simulate_strategy(
-    #     rng_key,
-    #     strategy,
-    #     obs_history,
-    #     new_obs,
-    #     v_self,
-    #     0,
-    #     0.75,
-    #     beta,
-    #     beta_self,
-    #     repeats,
-    #     **kwargs,
-    # )
-    # tmp["strategy"] = strat_name
-    # tmp["agents known"] = True
-    # tmp["groups relevant"] = True
-    # results = pd.concat([results, tmp])
+        tmp = simulate_strategy(
+            rng_key,
+            strat,
+            obs_history,
+            new_obs,
+            agent_vs[0],
+            0,
+            args,
+            **kwargs,
+        )
+        tmp["strategy"] = strat_name
+        tmp["agents known"] = True
+        tmp["groups relevant"] = True
+        results = pd.concat([results, tmp])
 
     # agents unknown, groups relevant
     new_obs = []
@@ -116,12 +117,9 @@ def analyse_strategy_humanlikeness(
         strat,
         obs_history,
         new_obs,
-        v_self,
+        agent_vs[0],
         0,
-        0.75,
-        args.beta,
-        args.beta_self,
-        args.N,
+        args,
         **kwargs,
     )
     tmp["strategy"] = strat_name
@@ -130,18 +128,14 @@ def analyse_strategy_humanlikeness(
     results = pd.concat([results, tmp])
 
     # agents unknown, groups irrelevant
-    v_self = jnp.array([0.5, 0])
     tmp = simulate_strategy(
         rng_key,
         strat,
         obs_history,
         new_obs,
-        v_self,
+        jnp.array([0.5, 0]),
         0,
-        0.75,
-        args.beta,
-        args.beta_self,
-        args.N,
+        args,
         **kwargs,
     )
     tmp["strategy"] = strat_name

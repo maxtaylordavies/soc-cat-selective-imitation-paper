@@ -131,33 +131,35 @@ def plot_strategy_performance(data, weights, phis, vselfs, model_name, filename)
     fig.savefig(filename)
 
 
-def make_condition_barplots(
-    data, flavour="binary", plot_dir="results/tmp", filename=None, formats=["svg"]
-):
-    forbidden_combinations = {
-        (True, "arbitrary"),  # (groups relevant, own group label)
-        (False, "matched"),
-        (False, "mismatched"),
-    }
+def make_barplots(data, flavour="binary", plot_dir="results/tmp", filename="barplots"):
+    # first make figure for known agents phase
+    fig, ax = plt.subplots()
+    df = data.loc[data["agents known"] == True]
+    barplot(
+        df[~df["strategy"].str.contains("group")],
+        flavour=flavour,
+        ax=ax,
+        legend=True,
+    )
+    save_figure(fig, f"{plot_dir}/{filename}_known")
 
-    fig, axs = plt.subplots(2, 4, sharex=True, sharey=True, figsize=(16, 8))
-    for col, own_group in enumerate(["hidden", "arbitrary", "matched", "mismatched"]):
-        df = data[data["own group label"] == own_group]
-
-        # tmp = df.loc[df["agents known"] == True]
-        # barplot(tmp, flavour=flavour, ax=axs[0, i], legend=i == 0)
-
-        df = df.loc[df["agents known"] == False]
-        for row, groups_relevant in enumerate([False, True]):
-            tmp = df.loc[df["groups relevant"] == groups_relevant]
-            if (groups_relevant, own_group) in forbidden_combinations:
-                continue
-            barplot(tmp, flavour=flavour, ax=axs[row, col])
-
-    fig.tight_layout()
-    for fmt in formats:
-        filename = filename or f"barplots"
-        fig.savefig(f"{plot_dir}/{filename}.{fmt}")
+    # then make figure for unknown agents phase
+    fig, axs = plt.subplots(1, 5, sharex=True, sharey=True, figsize=(20, 4))
+    combinations = [  # (groups relevant, own group label)
+        (False, "hidden"),
+        (False, "arbitrary"),
+        (True, "hidden"),
+        (True, "matched"),
+        (True, "mismatched"),
+    ]
+    for i, (groups_relevant, own_group) in enumerate(combinations):
+        df = data.loc[
+            (data["agents known"] == False)
+            & (data["groups relevant"] == groups_relevant)
+            & (data["own group label"] == own_group)
+        ]
+        barplot(df, flavour=flavour, ax=axs[i], legend=i == 0)
+    save_figure(fig, f"{plot_dir}/{filename}_unknown")
 
 
 def barplot_stacked(data, ax, flavour="binary", show_x_label=False, show_y_label=False):
@@ -169,13 +171,9 @@ def barplot_stacked(data, ax, flavour="binary", show_x_label=False, show_y_label
         x="strategy",
         y="imitation",
         color="same group",
-        # palette=["#01C58A", "#1100D1"],
-        # ax=ax,
-    ).add(so.Bar(), so.Agg("sum"), so.Norm(func="sum", by=["x"]), so.Stack()).scale(
-        color=["#01C58A", "#1100D1"]
-    ).on(
-        ax
-    ).plot()
+    ).add(
+        so.Bar(), so.Agg("sum"), so.Norm(func="sum", by=["x"]), so.Stack()
+    ).scale(color=["#01C58A", "#1100D1"]).on(ax).plot()
 
     ax.axhline(0.5, ls="--", color="black")
 
@@ -184,27 +182,31 @@ def barplot_stacked(data, ax, flavour="binary", show_x_label=False, show_y_label
     ax.set(ylim=(0, 1), xlabel=x_label, ylabel=y_label)
 
 
-def barplot(
-    data, ax, flavour="binary", show_x_label=False, show_y_label=False, legend=False
-):
+def barplot(data, ax, flavour="binary", y_label=False, legend=False):
     if len(data) == 0:
         return
 
     # estimator = lambda x: sum(x) / len(x) if flavour == "binary" else "mean"
     estimator = lambda x: 100 * sum(x) / len(x) if len(x) > 0 else 0
 
-    x_label = "Strategy" if show_x_label else ""
-    y_label = "% imitation agent 1" if show_y_label else ""
-
     plot = sns.barplot(
         data,
         x="strategy",
         hue="group",
         y=f"imitation",
-        palette=["#01C58A", "#1100D1"],
+        palette=["#FF0000", "#0000FF"],
         estimator=estimator,
         ax=ax,
         legend=legend,
     )
+    if legend:
+        handles, _ = plot.get_legend_handles_labels()
+        plot.legend(handles=handles, labels=["red", "blue"], title="Excplicit group")
     plot.axhline(50, ls="--", color="black")
-    plot.set(ylim=(0, 100), xlabel=x_label, ylabel=y_label)
+    plot.set(ylim=(0, 100), xlabel="", ylabel="% imitation" if y_label else "")
+
+
+def save_figure(fig, path, formats=["pdf", "svg"]):
+    fig.tight_layout()
+    for fmt in formats:
+        fig.savefig(f"{path}.{fmt}")

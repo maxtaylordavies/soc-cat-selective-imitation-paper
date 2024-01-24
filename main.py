@@ -13,24 +13,18 @@ from src.utils import (
     load_sessions,
     save_responses,
     generate_bonus_file,
-    plot_strategy_performance,
     surfaceplot,
     value_similarity,
-    make_condition_barplots,
+    make_barplots,
 )
 from src.human import analyse_sessions
 from src.modelling import (
-    simulate_choices,
-    simulate_strategy,
-    simulate_imitation,
     simulate_imitation_old,
-    analyse_strategy_performance,
-    generate_behaviour_simple,
+    generate_behaviour,
     analyse_strategy_humanlikeness,
     random_locs,
 )
 from src.modelling.strategies import (
-    indiscriminate,
     ingroup_bias,
     individual_inference,
     groups_inference,
@@ -143,8 +137,16 @@ def generate_obs_history(rng_key: jax.Array, mus: jnp.array, args):
     K = mus.shape[0]
     weights = jnp.ones(K) / K
     sigmas = args.sigma * jnp.ones((K, 2))
-    behaviour = generate_behaviour_simple(
-        rng_key, weights, mus, sigmas, args.M, args.N, beta=args.beta
+    behaviour = generate_behaviour(
+        rng_key,
+        weights,
+        mus,
+        sigmas,
+        args.M,
+        args.N,
+        beta=args.beta,
+        c=args.c,
+        shortcut=args.shortcut,
     )
     return mus, sigmas, behaviour
 
@@ -187,6 +189,16 @@ def setup():
             type=float,
             default=0.1,
         )
+        parser.add_argument(
+            "--ingroup-strength",
+            type=float,
+            default=0.75,
+        )
+        parser.add_argument(
+            "--shortcut",
+            default=False,
+            action="store_true",
+        )
         return parser.parse_args()
 
     # set random key for reproducibility
@@ -211,39 +223,16 @@ def setup():
 
 rng_key, args = setup()
 
-# # load human experiment data
-# filters = {"experimentId": EXPERIMENT_IDS}
-# sessions = load_sessions(filters)
+# load human experiment data
+sessions = load_sessions(filters={"experimentId": EXPERIMENT_IDS})
 
 # generate_bonus_file(sessions, "bonuses.txt")
 # save_responses(sessions, f"../results/responses.txt")
 
-# # analyse human experiment data
-# human_data = analyse_sessions(sessions)
-# make_condition_barplots(human_data)
+# analyse human experiment data
+human_data = analyse_sessions(sessions)
+make_barplots(human_data, plot_dir=args.results_dir, filename="human")
 
-# analyse strategy performance
-# _, _, obs_history = generate_obs_history(
-#     rng_key, args.K, args.M, args.N, args.sigma, args.beta
-# )
-# results, weights, phis, vselfs = analyse_strategy_performance(
-#     rng_key,
-#     STRATEGY_DICT,
-#     obs_history,
-#     K=args.K,
-#     beta=args.beta,
-#     plot_dir=args.results_dir,
-# )
-# for name in STRATEGY_DICT.keys():
-#     key = name.replace(" ", "_")
-#     plot_strategy_performance(
-#         results,
-#         weights,
-#         phis,
-#         vselfs,
-#         name,
-#         filename=f"{args.results_dir}/strategy_performance_{key}.png",
-#     )
 
 # compare strategies to human data
 mus = jnp.array([[0, 0.5], [1, 0.5]])
@@ -260,13 +249,11 @@ results = pd.DataFrame(
 )
 for name, strat in STRATEGY_DICT.items():
     results = analyse_strategy_humanlikeness(
-        rng_key, obs_history, results, strat, name, args
+        rng_key, mus, obs_history, results, strat, name, args
     )
 
-# human_data["strategy"] = "human"
-# results = pd.concat([results, human_data])
-
 # temporary hack
+# human_data["strategy"] = "human"
 tmp = pd.DataFrame(
     {
         "group": [0, 0, 0],
@@ -277,9 +264,7 @@ tmp = pd.DataFrame(
         "strategy": ["human", "human", "human"],
     }
 )
-results = pd.concat([results, tmp])
+results = pd.concat([results, human_data, tmp])
 results["group"] = results["group"].astype(int)
 
-make_condition_barplots(
-    results, plot_dir=args.results_dir, filename="barplots", formats=["png", "svg"]
-)
+make_barplots(results, plot_dir=args.results_dir, filename="models")

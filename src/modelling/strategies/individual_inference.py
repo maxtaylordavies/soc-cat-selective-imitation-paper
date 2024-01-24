@@ -13,16 +13,18 @@ def individual_agent_model(data):
     choices, noise = data
     choices_per_agent = jnp.sum(choices)
 
-    v = numpyro.sample("v", dist.MultivariateNormal(jnp.zeros(2) + 0.5, 1.0 * jnp.eye(2)))
+    v = numpyro.sample(
+        "v", dist.MultivariateNormal(jnp.zeros(2) + 0.5, 1.0 * jnp.eye(2))
+    )
     v_ = jnp.stack(item_values(v[..., 0], v[..., 1], as_dict=False), axis=-1)
     p = jnp.exp(v_ / noise)
     p /= jnp.sum(p, axis=-1, keepdims=True)
 
     # choices contains the empirical choice proportions for each agent
     # we can compute their log likelihood under a multinomial distribution
-    choices_log_prob = dist.Multinomial(probs=p, total_count=choices_per_agent).log_prob(
-        choices
-    )
+    choices_log_prob = dist.Multinomial(
+        probs=p, total_count=choices_per_agent
+    ).log_prob(choices)
 
     numpyro.factor(
         "obs",
@@ -56,7 +58,7 @@ def individual_inference(
 
         # compute expected similarity over posterior samples
         samples = mcmc.get_samples()
-        sims = jnp.array([value_similarity(v_self, v) for v in samples["v"]])
+        sims = jnp.array([value_similarity(v_self, v)[1] for v in samples["v"]])
         weights = weights.at[m].set(sims.mean())
 
     return weights / jnp.sum(weights)

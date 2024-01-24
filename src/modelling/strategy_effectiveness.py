@@ -4,7 +4,6 @@ from tqdm import tqdm
 import pandas as pd
 
 from .preliminary import simulate_choices, simulate_trajectories, simulate_imitation
-from .strategies.groups_inference import groups_inference
 from ..utils import v_domain_2d
 
 
@@ -43,34 +42,35 @@ def analyse_strategy_performance(
         # compute weights
         for name, strategy in strategy_dict.items():
             weights[name].append(
-                strategy(rng_key, obs_history, beta, v_self, v_domain, plot_dir=plot_dir)
+                strategy(
+                    rng_key, obs_history, beta, v_self, v_domain, plot_dir=plot_dir
+                )
             )
 
     return pd.DataFrame(imitation_results), weights, phis, v_selfs
 
 
 def generate_behaviour(
-    rng_key, weights, mus, sigmas, num_agents, num_trials, beta=0.01, c=0.1
+    rng_key,
+    weights,
+    mus,
+    sigmas,
+    num_agents,
+    num_trials,
+    beta=0.01,
+    c=0.1,
+    shortcut=False,
 ):
     agents = []
     z = random.categorical(rng_key, weights, shape=(num_agents,))
     for m in tqdm(range(num_agents), desc="sampling behaviour"):
         v = random.multivariate_normal(rng_key, mus[z[m]], jnp.diag(sigmas[z[m]]))
-        choices, trajs = simulate_trajectories(rng_key, v, c=c, beta=beta, N=num_trials)
+        if shortcut:
+            choices, trajs = simulate_choices(rng_key, v, beta=beta, N=num_trials), []
+        else:
+            choices, trajs = simulate_trajectories(
+                rng_key, v, c=c, beta=beta, N=num_trials
+            )
         agents.append({"phi": z[m], "v": v, "choices": choices, "trajs": trajs})
-
-    return agents
-
-
-def generate_behaviour_simple(
-    rng_key, weights, mus, sigmas, num_agents, num_trials, beta=0.01
-):
-    agents = []
-    z = random.categorical(rng_key, weights, shape=(num_agents,))
-    keys = random.split(rng_key, num_agents)
-    for m in tqdm(range(num_agents), desc="sampling behaviour"):
-        v = random.multivariate_normal(keys[m], mus[z[m]], jnp.diag(sigmas[z[m]]))
-        choices = simulate_choices(keys[m], v, beta=beta, N=num_trials)
-        agents.append({"phi": z[m], "v": v, "choices": choices})
 
     return agents
