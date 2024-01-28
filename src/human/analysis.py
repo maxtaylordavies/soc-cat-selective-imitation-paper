@@ -24,8 +24,8 @@ def to_coords(start, trajectory):
 
     for i, a in enumerate(actions):
         c = coords[i] + ACTION_MAP[a]
-        if c[0] < MIN_X or c[0] > MAX_X or c[1] < MIN_Y or c[1] > MAX_Y:
-            break
+        # if c[0] < MIN_X or c[0] > MAX_X or c[1] < MIN_Y or c[1] > MAX_Y:
+        #     break
         coords = coords.at[i + 1].set(c)
 
     return coords

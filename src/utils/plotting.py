@@ -133,32 +133,36 @@ def plot_strategy_performance(data, weights, phis, vselfs, model_name, filename)
 
 def make_barplots(data, plot_dir="results/tmp", filename="barplots"):
     # first make figure for known agents phase
-    fig, ax = plt.subplots()
     df = data.loc[data["agents known"] == True]
-    barplot(
-        df[~df["strategy"].str.contains("group")],
-        ax=ax,
-        legend=True,
-    )
-    save_figure(fig, f"{plot_dir}/{filename}_known")
+    if len(df):
+        fig, ax = plt.subplots()
+        barplot(
+            df[~df["strategy"].str.contains("group")],
+            ax=ax,
+            legend=True,
+        )
+        save_figure(fig, f"{plot_dir}/{filename}_known")
 
     # then make figure for unknown agents phase
-    fig, axs = plt.subplots(1, 5, sharex=True, sharey=True, figsize=(20, 4))
-    combinations = [  # (groups relevant, own group label)
-        (False, "hidden"),
-        (False, "arbitrary"),
-        (True, "hidden"),
-        (True, "matched"),
-        (True, "mismatched"),
-    ]
-    for i, (groups_relevant, own_group) in enumerate(combinations):
-        df = data.loc[
-            (data["agents known"] == False)
-            & (data["groups relevant"] == groups_relevant)
-            & (data["own group label"] == own_group)
+    df = data.loc[data["agents known"] == False]
+    if len(df):
+        conds = [  # (groups relevant, own group label)
+            (False, "hidden"),
+            (False, "arbitrary"),
+            (True, "hidden"),
+            (True, "matched"),
+            (True, "mismatched"),
         ]
-        barplot(df, ax=axs[i], legend=i == 0)
-    save_figure(fig, f"{plot_dir}/{filename}_unknown")
+        fig, axs = plt.subplots(
+            1, len(conds), sharex=True, sharey=True, figsize=(20, 4)
+        )
+        for i, (groups_relevant, own_group) in enumerate(conds):
+            df = df.loc[
+                (df["groups relevant"] == groups_relevant)
+                & (df["own group label"] == own_group)
+            ]
+            barplot(df, ax=axs[i], legend=i == 0)
+        save_figure(fig, f"{plot_dir}/{filename}_unknown")
 
 
 def barplot_stacked(data, ax, flavour="binary", show_x_label=False, show_y_label=False):

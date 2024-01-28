@@ -18,13 +18,13 @@ def load_json(fp):
     return data
 
 
-def load_sessions(filters, print_stats=False):
+def load_sessions(filters=None, sessions_path=SESSIONS_PATH, print_stats=False):
     sessions = []
-    for f in os.listdir(SESSIONS_PATH):
+    for f in os.listdir(sessions_path):
         if f.endswith(".json"):
             try:
-                s = load_json(os.path.join(SESSIONS_PATH, f))
-                if all([s[k] in v for k, v in filters.items()]):
+                s = load_json(os.path.join(sessions_path, f))
+                if filters is None or all([s[k] in v for k, v in filters.items()]):
                     sessions.append(s)
             except:
                 continue
