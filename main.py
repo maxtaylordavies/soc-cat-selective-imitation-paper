@@ -17,7 +17,7 @@ from src.utils import (
     value_similarity,
     make_barplots,
 )
-from src.human import analyse_sessions
+from src.human import analyse_sessions, similarity_binary, similarity_continuous
 from src.modelling import (
     simulate_imitation_old,
     generate_behaviour,
@@ -154,6 +154,7 @@ def generate_obs_history(rng_key: jax.Array, mus: jnp.array, args):
 def setup():
     def parse_args():
         parser = argparse.ArgumentParser()
+        parser.add_argument("--run-name", type=str, default="")
         parser.add_argument(
             "--M",
             type=int,
@@ -199,6 +200,11 @@ def setup():
             default=False,
             action="store_true",
         )
+        parser.add_argument(
+            "--sim-type",
+            type=str,
+            default="continuous",
+        )
         return parser.parse_args()
 
     # set random key for reproducibility
@@ -209,9 +215,10 @@ def setup():
     # parse any command line arguments
     args = parse_args()
 
-    # define run name based on current date and time
-    run_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    args.results_dir = f"results/{run_name}"
+    # if not provided, set run name based on current date and time
+    if args.run_name == "":
+        args.run_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    args.results_dir = f"results/{args.run_name}"
     if not os.path.exists(args.results_dir):
         os.makedirs(args.results_dir)
 
@@ -224,13 +231,14 @@ def setup():
 rng_key, args = setup()
 
 # load human experiment data
-sessions = load_sessions(filters={"experimentId": EXPERIMENT_IDS})
+sessions = load_sessions(filters={"experimentId": EXPERIMENT_IDS}, print_stats=True)
 
 # generate_bonus_file(sessions, "bonuses.txt")
 # save_responses(sessions, f"../results/responses.txt")
 
 # analyse human experiment data
-human_data = analyse_sessions(sessions)
+sim_func = similarity_binary if args.sim_type == "binary" else similarity_continuous
+human_data = analyse_sessions(sessions, sim_func)
 make_barplots(human_data, plot_dir=args.results_dir, filename="human")
 
 
@@ -253,7 +261,6 @@ for name, strat in STRATEGY_DICT.items():
     )
 
 # temporary hack
-# human_data["strategy"] = "human"
 tmp = pd.DataFrame(
     {
         "group": [0, 0, 0],

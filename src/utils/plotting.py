@@ -131,13 +131,12 @@ def plot_strategy_performance(data, weights, phis, vselfs, model_name, filename)
     fig.savefig(filename)
 
 
-def make_barplots(data, flavour="binary", plot_dir="results/tmp", filename="barplots"):
+def make_barplots(data, plot_dir="results/tmp", filename="barplots"):
     # first make figure for known agents phase
     fig, ax = plt.subplots()
     df = data.loc[data["agents known"] == True]
     barplot(
         df[~df["strategy"].str.contains("group")],
-        flavour=flavour,
         ax=ax,
         legend=True,
     )
@@ -158,7 +157,7 @@ def make_barplots(data, flavour="binary", plot_dir="results/tmp", filename="barp
             & (data["groups relevant"] == groups_relevant)
             & (data["own group label"] == own_group)
         ]
-        barplot(df, flavour=flavour, ax=axs[i], legend=i == 0)
+        barplot(df, ax=axs[i], legend=i == 0)
     save_figure(fig, f"{plot_dir}/{filename}_unknown")
 
 
@@ -182,12 +181,9 @@ def barplot_stacked(data, ax, flavour="binary", show_x_label=False, show_y_label
     ax.set(ylim=(0, 1), xlabel=x_label, ylabel=y_label)
 
 
-def barplot(data, ax, flavour="binary", y_label=False, legend=False):
+def barplot(data, ax, y_label=False, legend=False):
     if len(data) == 0:
         return
-
-    # estimator = lambda x: sum(x) / len(x) if flavour == "binary" else "mean"
-    estimator = lambda x: 100 * sum(x) / len(x) if len(x) > 0 else 0
 
     plot = sns.barplot(
         data,
@@ -195,15 +191,15 @@ def barplot(data, ax, flavour="binary", y_label=False, legend=False):
         hue="group",
         y=f"imitation",
         palette=["#FF0000", "#0000FF"],
-        estimator=estimator,
+        estimator="mean",
         ax=ax,
         legend=legend,
     )
     if legend:
         handles, _ = plot.get_legend_handles_labels()
         plot.legend(handles=handles, labels=["red", "blue"], title="Excplicit group")
-    plot.axhline(50, ls="--", color="black")
-    plot.set(ylim=(0, 100), xlabel="", ylabel="% imitation" if y_label else "")
+    plot.axhline(0.5, ls="--", color="black")
+    plot.set(ylim=(0, 1), xlabel="", ylabel="% imitation" if y_label else "")
 
 
 def save_figure(fig, path, formats=["pdf", "svg"]):

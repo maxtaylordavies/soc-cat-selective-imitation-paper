@@ -18,7 +18,7 @@ def load_json(fp):
     return data
 
 
-def load_sessions(filters, print_stats=True):
+def load_sessions(filters, print_stats=False):
     sessions = []
     for f in os.listdir(SESSIONS_PATH):
         if f.endswith(".json"):
@@ -34,9 +34,8 @@ def load_sessions(filters, print_stats=True):
     if print_stats:
         phi_counter, pref_counter = {}, {}
         for s in sessions:
-            phi = s["conditions"]["phi"]
-            phi_counter[phi] = phi_counter.get(phi, 0) + 1
-            thetas = jnp.array(s["conditions"]["thetas"])
+            phi_counter[s["phi"]] = phi_counter.get(s["phi"], 0) + 1
+            thetas = jnp.array(s["thetas"])
             if thetas[0][0] > thetas[0][1]:
                 pref_counter["yellow"] = pref_counter.get("yellow", 0) + 1
             elif thetas[0][0] < thetas[0][1]:
