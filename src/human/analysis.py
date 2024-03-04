@@ -68,7 +68,7 @@ def similarity_binary(traj1: str, traj2: str, start: str) -> float:
 def similarity_continuous(traj1: str, traj2: str, start: str) -> float:
     t1, t2 = to_coords(start, traj1), to_coords(start, traj2)
     dist = frechet_dist(t1, t2)
-    return float(jnp.exp(-frechet_dist(t1, t2)))
+    return float(jnp.exp(-dist))
 
 
 def get_trajectory_dict(session, phase_idx):
