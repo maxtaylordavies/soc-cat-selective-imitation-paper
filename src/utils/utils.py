@@ -18,34 +18,35 @@ def load_json(fp):
     return data
 
 
-def load_sessions(filters=None, sessions_path=SESSIONS_PATH, print_stats=False):
+def load_sessions(sessions_path=SESSIONS_PATH, print_breakdown=False):
     sessions = []
     for f in os.listdir(sessions_path):
-        if f.endswith(".json"):
-            try:
-                s = load_json(os.path.join(sessions_path, f))
-                if filters is None or all([s[k] in v for k, v in filters.items()]):
-                    sessions.append(s)
-            except:
+        if not f.endswith(".json"):
+            continue
+        try:
+            s = load_json(os.path.join(sessions_path, f))
+            if (
+                "condition" not in s
+                or s["context"] == {}
+                or s["trajectories"] is None
+                or len(s["trajectories"].keys()) != 3
+            ):
                 continue
+            sessions.append(s)
+        except:
+            continue
 
     print(f"Loaded {len(sessions)} sessions")
 
-    if print_stats:
-        phi_counter, pref_counter = {}, {}
+    if print_breakdown:
+        counter = {}
         for s in sessions:
-            phi_counter[s["phi"]] = phi_counter.get(s["phi"], 0) + 1
-            thetas = jnp.array(s["thetas"])
-            if thetas[0][0] > thetas[0][1]:
-                pref_counter["yellow"] = pref_counter.get("yellow", 0) + 1
-            elif thetas[0][0] < thetas[0][1]:
-                pref_counter["green"] = pref_counter.get("green", 0) + 1
-            elif thetas[1][0] > thetas[1][1]:
-                pref_counter["circle"] = pref_counter.get("circle", 0) + 1
-            elif thetas[1][0] < thetas[1][1]:
-                pref_counter["triangle"] = pref_counter.get("triangle", 0) + 1
-        print(f"phi: {phi_counter}")
-        print(f"pref: {pref_counter}")
+            pr = "relevant" if s["condition"]["phisRelevant"] else "irrelevant"
+            ppt = s["condition"]["participantPhiType"]
+            counter[(pr, ppt)] = counter.get((pr, ppt), 0) + 1
+        print("Condition counts:")
+        for k, v in counter.items():
+            print(f"{k}: {v}")
 
     return sessions
 

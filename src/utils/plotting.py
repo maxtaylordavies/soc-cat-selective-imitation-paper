@@ -106,7 +106,7 @@ def plot_strategy_performance(data, weights, phis, vselfs, model_name, filename)
             y="reward",
             hue="phi",
             join=False,
-            dodge=0.8 - 0.8 / 3,
+            dodge=True,
             scale=1.25,
             errorbar=None,
             ax=axs[1, i],
@@ -141,7 +141,8 @@ def make_barplots(data, plot_dir="results/tmp", filename="barplots"):
             ax=ax,
             legend=True,
         )
-        save_figure(fig, f"{plot_dir}/{filename}_known")
+        plt.show()
+        # save_figure(fig, f"{plot_dir}/{filename}_known")
 
     # then make figure for unknown agents phase
     df = data.loc[data["agents known"] == False]
@@ -156,33 +157,14 @@ def make_barplots(data, plot_dir="results/tmp", filename="barplots"):
         fig, axs = plt.subplots(
             1, len(conds), sharex=True, sharey=True, figsize=(20, 4)
         )
-        for i, (groups_relevant, own_group) in enumerate(conds):
-            df = df.loc[
-                (df["groups relevant"] == groups_relevant)
-                & (df["own group label"] == own_group)
-            ]
-            barplot(df, ax=axs[i], legend=i == 0)
-        save_figure(fig, f"{plot_dir}/{filename}_unknown")
-
-
-def barplot_stacked(data, ax, flavour="binary", show_x_label=False, show_y_label=False):
-    if len(data) == 0:
-        return
-
-    so.Plot(
-        data=data,
-        x="strategy",
-        y="imitation",
-        color="same group",
-    ).add(
-        so.Bar(), so.Agg("sum"), so.Norm(func="sum", by=["x"]), so.Stack()
-    ).scale(color=["#01C58A", "#1100D1"]).on(ax).plot()
-
-    ax.axhline(0.5, ls="--", color="black")
-
-    x_label = "Strategy" if show_x_label else ""
-    y_label = "% imitation agent 1" if show_y_label else ""
-    ax.set(ylim=(0, 1), xlabel=x_label, ylabel=y_label)
+        for i, (gr, ogl) in enumerate(conds):
+            barplot(
+                df.loc[(df["groups relevant"] == gr) & (df["own group label"] == ogl)],
+                ax=axs[i],
+                legend=i == 0,
+            )
+        plt.show()
+        # save_figure(fig, f"{plot_dir}/{filename}_unknown")
 
 
 def barplot(data, ax, y_label=False, legend=False):
@@ -195,7 +177,7 @@ def barplot(data, ax, y_label=False, legend=False):
         hue="group",
         y=f"imitation",
         palette=["#FF0000", "#0000FF"],
-        estimator="mean",
+        errorbar="se",
         ax=ax,
         legend=legend,
     )

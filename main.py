@@ -30,16 +30,6 @@ from src.modelling.strategies import (
     groups_inference,
 )
 
-EXPERIMENT_IDS = [
-    "prolific-test-2",
-    "prolific-test-3",
-    "prolific-test-4",
-    "prolific-test-5",
-    "prolific-test-6",
-    "prolific-test-7",
-    "prolific-test-8",
-]
-
 STRATEGY_DICT = {
     "individual inference": individual_inference,
     "ingroup bias": ingroup_bias,
@@ -231,47 +221,47 @@ def setup():
 rng_key, args = setup()
 
 # load human experiment data
-sessions = load_sessions(filters={"experimentId": EXPERIMENT_IDS}, print_stats=True)
+sessions = load_sessions(print_breakdown=True)
 
 # generate_bonus_file(sessions, "bonuses.txt")
 # save_responses(sessions, f"../results/responses.txt")
 
 # analyse human experiment data
 sim_func = similarity_binary if args.sim_type == "binary" else similarity_continuous
-human_data = analyse_sessions(sessions, sim_func)
+human_data = analyse_sessions(sessions, similarity_continuous)
 make_barplots(human_data, plot_dir=args.results_dir, filename="human")
 
 
-# compare strategies to human data
-mus = jnp.array([[0, 0.5], [1, 0.5]])
-_, _, obs_history = generate_obs_history(rng_key, mus, args)
-results = pd.DataFrame(
-    {
-        "group": [],
-        "imitation": [],
-        "agents known": [],
-        "groups relevant": [],
-        "own group label": [],
-        "strategy": [],
-    }
-)
-for name, strat in STRATEGY_DICT.items():
-    results = analyse_strategy_humanlikeness(
-        rng_key, mus, obs_history, results, strat, name, args
-    )
+# # compare strategies to human data
+# mus = jnp.array([[0, 0.5], [1, 0.5]])
+# _, _, obs_history = generate_obs_history(rng_key, mus, args)
+# results = pd.DataFrame(
+#     {
+#         "group": [],
+#         "imitation": [],
+#         "agents known": [],
+#         "groups relevant": [],
+#         "own group label": [],
+#         "strategy": [],
+#     }
+# )
+# for name, strat in STRATEGY_DICT.items():
+#     results = analyse_strategy_humanlikeness(
+#         rng_key, mus, obs_history, results, strat, name, args
+#     )
 
-# temporary hack
-tmp = pd.DataFrame(
-    {
-        "group": [0, 0, 0],
-        "imitation": [0, 0, 0],
-        "agents known": [True, False, False],
-        "groups relevant": [True, True, False],
-        "own group label": ["mismatched", "mismatched", "mismatched"],
-        "strategy": ["human", "human", "human"],
-    }
-)
-results = pd.concat([results, human_data, tmp])
-results["group"] = results["group"].astype(int)
+# # temporary hack
+# tmp = pd.DataFrame(
+#     {
+#         "group": [0, 0, 0],
+#         "imitation": [0, 0, 0],
+#         "agents known": [True, False, False],
+#         "groups relevant": [True, True, False],
+#         "own group label": ["mismatched", "mismatched", "mismatched"],
+#         "strategy": ["human", "human", "human"],
+#     }
+# )
+# results = pd.concat([results, human_data, tmp])
+# results["group"] = results["group"].astype(int)
 
-make_barplots(results, plot_dir=args.results_dir, filename="models")
+# make_barplots(results, plot_dir=args.results_dir, filename="models")

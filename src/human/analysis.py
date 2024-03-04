@@ -61,12 +61,13 @@ def frechet_dist(traj1: jnp.ndarray, traj2: jnp.ndarray) -> float:
 
 def similarity_binary(traj1: str, traj2: str, start: str) -> float:
     t1, t2 = traj1.split(","), traj2.split(",")
-    return max(set(t1), key=t1.count) == max(set(t2), key=t2.count)
+    return float(max(set(t1), key=t1.count) == max(set(t2), key=t2.count))
 
 
 # compute similarity between two trajectories as the exponential of the negative frechet distance
 def similarity_continuous(traj1: str, traj2: str, start: str) -> float:
     t1, t2 = to_coords(start, traj1), to_coords(start, traj2)
+    dist = frechet_dist(t1, t2)
     return float(jnp.exp(-frechet_dist(t1, t2)))
 
 
@@ -111,10 +112,10 @@ def analyse_trajectory_dict(td, sim_func):
     for start in starts:
         trajs_p = td["participant"][start]
         for i, tp in enumerate(trajs_p):
-            sims = jnp.array(
-                [sim_func(tp, td[f"agent {j}"][start][i], start) for j in (1, 2)]
-            )
-            sims = norm_unit_sum(sims)
+            trajs_a = [td[f"agent {j}"][start][i] for j in (1, 2)]
+            if trajs_a[0] == trajs_a[1]:
+                continue
+            sims = norm_unit_sum(jnp.array([sim_func(tp, ta, start) for ta in trajs_a]))
             for k in (0, 1):
                 data[f"sim_{k+1}"].append(float(sims[k]))
 
@@ -134,21 +135,17 @@ def analyse_sessions(sessions, sim_func):
         groups_relevant = s["condition"]["phisRelevant"]
         own_group_label = s["condition"]["participantPhiType"]
 
-        # collapse counterbalancing:
-        # if the participant has an explicit group label, then that should
-        # correspond to 'group 1'. otherwise, if the groups are relevant,
-        # then the participant's utility function should put them in 'group 1'
-        reverse = False
-        if s["phi"] == 1:
-            reverse = True
-        elif s["phi"] == -1:
-            thetas = jnp.array(s["thetas"])
-            reverse = bool(1 - int(jnp.argmin(thetas) % 2))
-
         for phase_idx in [2, 4]:
             d = get_trajectory_dict(s, phase_idx)
             if d is None:
                 continue
+
+            reverse = False
+            if phase_idx == 4:
+                own_real_group = 1 - int(jnp.argmin(jnp.array(s["thetas"])) % 2)
+                if s["phi"] not in {-1, own_real_group}:
+                    reverse = True
+
             tmp = analyse_trajectory_dict(d, sim_func)
             for i, group in enumerate([1, 0] if reverse else [0, 1]):
                 vals = tmp[f"sim_{i + 1}"]

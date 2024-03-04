@@ -14,10 +14,14 @@ EXPERIMENT_IDS = [
     "prolific-test-6",
     "prolific-test-7",
     "prolific-test-8",
+    "prolific-final-1",
 ]
 
 
 def convert_session(session):
+    if "conditions" not in session:
+        return session
+
     cond = session["conditions"]
     del session["conditions"]
 
@@ -40,7 +44,9 @@ def convert_session(session):
     return session
 
 
-sessions = load_sessions(filters={"experimentId": EXPERIMENT_IDS}, print_stats=False)
+sessions = load_sessions(
+    filters={"experimentId": EXPERIMENT_IDS}, print_breakdown=False
+)
 for s in tqdm(sessions):
     updated = convert_session(s)
     with open(os.path.join(SESSIONS_PATH, f"{s['id']}.json"), "w") as f:
