@@ -148,12 +148,12 @@ def setup():
         parser.add_argument(
             "--M",
             type=int,
-            default=500,
+            default=50,
         )
         parser.add_argument(
             "--N",
             type=int,
-            default=1000,
+            default=500,
         )
         parser.add_argument(
             "--K",
@@ -228,40 +228,27 @@ sessions = load_sessions(print_breakdown=True)
 
 # analyse human experiment data
 sim_func = similarity_binary if args.sim_type == "binary" else similarity_continuous
-human_data = analyse_sessions(sessions, similarity_continuous)
+human_data = analyse_sessions(sessions, sim_func)
 make_barplots(human_data, plot_dir=args.results_dir, filename="human")
 
 
-# # compare strategies to human data
-# mus = jnp.array([[0, 0.5], [1, 0.5]])
-# _, _, obs_history = generate_obs_history(rng_key, mus, args)
-# results = pd.DataFrame(
-#     {
-#         "group": [],
-#         "imitation": [],
-#         "agents known": [],
-#         "groups relevant": [],
-#         "own group label": [],
-#         "strategy": [],
-#     }
-# )
-# for name, strat in STRATEGY_DICT.items():
-#     results = analyse_strategy_humanlikeness(
-#         rng_key, mus, obs_history, results, strat, name, args
-#     )
-
-# # temporary hack
-# tmp = pd.DataFrame(
-#     {
-#         "group": [0, 0, 0],
-#         "imitation": [0, 0, 0],
-#         "agents known": [True, False, False],
-#         "groups relevant": [True, True, False],
-#         "own group label": ["mismatched", "mismatched", "mismatched"],
-#         "strategy": ["human", "human", "human"],
-#     }
-# )
-# results = pd.concat([results, human_data, tmp])
-# results["group"] = results["group"].astype(int)
-
-# make_barplots(results, plot_dir=args.results_dir, filename="models")
+# compare strategies to human data
+mus = jnp.array([[0, 0.5], [1, 0.5]])
+_, _, obs_history = generate_obs_history(rng_key, mus, args)
+results = pd.DataFrame(
+    {
+        "group": [],
+        "imitation": [],
+        "agents known": [],
+        "groups relevant": [],
+        "own group label": [],
+        "strategy": [],
+    }
+)
+for name, strat in STRATEGY_DICT.items():
+    results = analyse_strategy_humanlikeness(
+        rng_key, mus, obs_history, results, strat, name, args
+    )
+results = pd.concat([results, human_data])
+results["group"] = results["group"].astype(int)
+make_barplots(results, plot_dir=args.results_dir, filename="models")

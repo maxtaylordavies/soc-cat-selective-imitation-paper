@@ -136,22 +136,24 @@ def analyse_sessions(sessions, sim_func):
         own_group_label = s["condition"]["participantPhiType"]
 
         for phase_idx in [2, 4]:
+            agents_known = phase_idx == 2
             d = get_trajectory_dict(s, phase_idx)
             if d is None:
                 continue
 
+            # collapse counterbalancing
             reverse = False
-            if phase_idx == 4:
-                own_real_group = 1 - int(jnp.argmin(jnp.array(s["thetas"])) % 2)
-                if s["phi"] not in {-1, own_real_group}:
-                    reverse = True
+            own_real_group = 1 - int(jnp.argmin(jnp.array(s["thetas"])) % 2)
+            if s["phi"] not in {-1, own_real_group} and not agents_known:
+                reverse = True
 
             tmp = analyse_trajectory_dict(d, sim_func)
+
             for i, group in enumerate([1, 0] if reverse else [0, 1]):
                 vals = tmp[f"sim_{i + 1}"]
                 results["group"].extend([group] * len(vals))
                 results["imitation"].extend(vals)
-                results["agents known"].extend([phase_idx == 2] * len(vals))
+                results["agents known"].extend([agents_known] * len(vals))
                 results["own group label"].extend([own_group_label] * len(vals))
                 results["groups relevant"].extend([groups_relevant] * len(vals))
 

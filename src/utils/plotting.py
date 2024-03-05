@@ -141,8 +141,7 @@ def make_barplots(data, plot_dir="results/tmp", filename="barplots"):
             ax=ax,
             legend=True,
         )
-        plt.show()
-        # save_figure(fig, f"{plot_dir}/{filename}_known")
+        save_figure(fig, f"{plot_dir}/{filename}_known")
 
     # then make figure for unknown agents phase
     df = data.loc[data["agents known"] == False]
@@ -163,8 +162,7 @@ def make_barplots(data, plot_dir="results/tmp", filename="barplots"):
                 ax=axs[i],
                 legend=i == 0,
             )
-        plt.show()
-        # save_figure(fig, f"{plot_dir}/{filename}_unknown")
+        save_figure(fig, f"{plot_dir}/{filename}_unknown")
 
 
 def barplot(data, ax, y_label=False, legend=False):
@@ -184,7 +182,7 @@ def barplot(data, ax, y_label=False, legend=False):
     if legend:
         handles, _ = plot.get_legend_handles_labels()
         plot.legend(handles=handles, labels=["red", "blue"], title="Excplicit group")
-    plot.axhline(0.5, ls="--", color="black")
+    plot.axhline(0.5, ls="--", color="black", alpha=0.5)
     plot.set(ylim=(0, 1), xlabel="", ylabel="% imitation" if y_label else "")
 
 
