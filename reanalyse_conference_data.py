@@ -1,14 +1,21 @@
 from datetime import datetime
-from os import path
+import os
+import time
+from typing import Callable, List
 
 import pandas as pd
+import jax
 import jax.numpy as jnp
+import numpyro
+import numpyro.distributions as dist
 import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from src.utils import load_sessions, norm_unit_sum, make_barplots
+from src.utils import load_json, norm_unit_sum, make_barplots, v_domain_2d
 from src.human import similarity_binary, similarity_continuous
+from src.modelling import generate_behaviour
+from src.modelling.strategies import individual_inference
 
 # ------------------------------------------------------------
 # CONSTANTS
@@ -87,15 +94,19 @@ START_POSITIONS = [
 # ------------------------------------------------------------
 
 
+def load_sessions(sessions_path):
+    sessions, counter = [], {}
+    for f in os.listdir(sessions_path):
+        if not f.endswith(".json"):
+            continue
+        s = load_json(os.path.join(sessions_path, f))
+        sessions.append(s)
+
+    print(f"Loaded {len(sessions)} sessions")
+    return sessions
+
+
 def analyse_sessions(sessions, sim_func):
-    # initialise data dict
-    # cols = []
-    # for l in (3, 4):
-    #     cols += [f"level_{l}_agent_{a + 1}" for a in LEVEL_AGENT_MAP[l]] + [
-    #         f"level_{l}_aligned",
-    #         f"level_{l}_misaligned",
-    #     ]
-    # data_dict = {col: [] for col in cols}
     data = {
         "level": [],
         "group": [],
@@ -140,13 +151,137 @@ def analyse_sessions(sessions, sim_func):
     return df[df["imitation"].isna() == False]
 
 
+def simulate_choices(rng_key: jax.Array, u, beta, N):
+    traj_options = [AGENT_TRAJECTORIES[i][3] for i in (0, 1)]
+    p = jnp.exp(u / beta)
+    p /= jnp.sum(u)
+    choices = jax.random.choice(rng_key, len(u), shape=(N,), p=p)
+    trajs = [traj_options[c] for c in choices]
+    return choices, trajs
+
+
+def generate_obs_history(
+    rng_key: jax.Array, mus: jnp.array, sigma=0.1, M=100, N=1000, beta=0.1, c=0.1
+):
+    K = mus.shape[0]
+    weights = jnp.ones(K) / K
+    sigmas = sigma * jnp.ones((K, 2))
+    obs_history = generate_behaviour(
+        rng_key,
+        weights,
+        mus,
+        sigmas,
+        M,
+        N,
+        beta=beta,
+        c=c,
+        simulation_func=simulate_choices,
+    )
+
+    new_obs = []
+    for m in range(2):
+        choices, _ = simulate_choices(rng_key, mus[m], beta=beta, N=N)
+        new_obs.append({"choices": choices})
+
+    return obs_history, new_obs
+
+
+def model(data):
+    """
+    Dirichlet process mixture model via the stick-breaking construction
+    """
+    choices, noise = data
+    v = numpyro.sample(
+        "v", dist.MultivariateNormal(jnp.zeros(2) + 0.5, 1.0 * jnp.eye(2))
+    )
+    p = jnp.exp(v / noise)
+    p /= jnp.sum(p, axis=-1, keepdims=True)
+
+    # choices contains the empirical choice proportions for each agent
+    # we can compute their log likelihood under a multinomial distribution
+    choices_log_prob = dist.Multinomial(probs=p, total_count=jnp.sum(choices)).log_prob(
+        choices
+    )
+    numpyro.factor(
+        "obs",
+        choices_log_prob,
+    )
+
+
+def run_model(
+    rng_key: jax.random.KeyArray,
+    obs_history: List[dict],
+    new_obs: List[dict],
+    v_self: jnp.ndarray,
+    beta=0.1,
+    beta_self=0.1,
+    N=1000,
+    **kwargs,
+):
+    weights = individual_inference(
+        rng_key,
+        obs_history,
+        new_obs,
+        beta,
+        v_self,
+        v_domain_2d(),
+        0,
+        0,
+        model=model,
+        num_options=2,
+    )
+
+    results = {
+        "group": [],
+        "imitation": [],
+    }
+
+    p = jnp.exp(weights / beta_self)
+    p /= jnp.sum(p)
+    for choice in jax.random.choice(rng_key, len(weights), shape=(N,), p=p):
+        for m in range(len(weights)):
+            results["group"].append(m)
+            results["imitation"].append(int(choice == m))
+
+    results["agents known"] = [True] * len(results["group"])
+    results["strategy"] = ["model"] * len(results["group"])
+    return pd.DataFrame(results)
+
+
+# M, N, beta, beta_self = 100, 1000, 0.1, 0.2
+
+# # set random key for reproducibility
+# seed = int(time.time())
+# rng_key = jax.random.PRNGKey(seed)
+# print(f"using seed {seed}")
+
+# mus = jnp.array([[0, 0.5], [1, 0.5]])
+# obs_history, new_obs = generate_obs_history(
+#     rng_key, mus, sigma=0.1, M=M, N=N, beta=beta, c=0.1
+# )
+
+# model_results = run_model(
+#     rng_key,
+#     obs_history,
+#     new_obs,
+#     v_self=mus[0],
+#     beta=beta,
+#     beta_self=beta_self,
+#     N=N,
+# )
+
+# load sessions
 sessions = load_sessions(
     sessions_path="/Users/max/Code/experiment-analyses/conference/data/sessions"
 )
-
 filter = lambda s: (not s["isTest"]) and s["trajectories"] and s["humanId"] != "h-max"
 sessions = [s for s in sessions if filter(s)]
 print(f"Num sessions after filtering: {len(sessions)}")
 
-results = analyse_sessions(sessions, sim_func=similarity_continuous)
-make_barplots(results, plot_dir="results/conference")
+print(sessions[0])
+
+# human_results = analyse_sessions(sessions, sim_func=similarity_continuous)
+
+# # combine results
+# results = pd.concat([human_results, model_results])
+# make_barplots(results)

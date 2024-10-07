@@ -86,7 +86,7 @@ def value_similarity(vself, v):
     sims = 1 - jnp.abs(vself - v)
     weights = jnp.abs(vself - 0.5)
     if jnp.sum(weights) == 0:
-        return 0
+        return jnp.zeros_like(vself), 0
     return sims, jnp.sum(sims * norm_unit_sum(weights))
 
 

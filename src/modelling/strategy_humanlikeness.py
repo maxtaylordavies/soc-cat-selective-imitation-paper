@@ -51,14 +51,20 @@ def simulate_strategy(
     for ogl in ["hidden", "arbitrary", "matched", "mismatched"]:
         obs_hist = deepcopy(obs_history)
         obs_new = deepcopy(new_obs)
-        _phi_self = None if ogl == "hidden" else phi_self
-        if ogl == "mismatched":
-            for i, a in enumerate(obs_hist):
-                if a["phi"] is not None:
-                    obs_hist[i]["phi"] = 1 - a["phi"]
-            for i, a in enumerate(obs_new):
-                if a["phi"] is not None:
-                    obs_new[i]["phi"] = 1 - a["phi"]
+        # _phi_self = None if ogl == "hidden" else phi_self
+        # if ogl == "mismatched":
+        #     for i, a in enumerate(obs_hist):
+        #         if a["phi"] is not None:
+        #             obs_hist[i]["phi"] = 1 - a["phi"]
+        #     for i, a in enumerate(obs_new):
+        #         if a["phi"] is not None:
+        #             obs_new[i]["phi"] = 1 - a["phi"]
+
+        _phi_self = phi_self
+        if ogl == "hidden":
+            _phi_self = None
+        elif ogl == "mismatched":
+            _phi_self = 1 - phi_self
 
         weights = strategy(
             rng_key,

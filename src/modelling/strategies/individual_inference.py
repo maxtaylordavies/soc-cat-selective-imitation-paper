@@ -41,6 +41,8 @@ def individual_inference(
     v_domain,
     phi_self,
     ingroup_strength,
+    num_options=4,
+    model=individual_agent_model,
     **kwargs,
 ):
     if new_obs[0]["choices"] is None:
@@ -49,7 +51,7 @@ def individual_inference(
     weights = jnp.zeros(len(new_obs))
     for m, a in enumerate(new_obs):
         tmp = jnp.array(a["choices"])
-        choice_counts = jnp.bincount(tmp, minlength=4)
+        choice_counts = jnp.bincount(tmp, minlength=num_options)
 
         # infer value function from observed choice counts
         kernel = numpyro.infer.NUTS(individual_agent_model)
@@ -61,4 +63,6 @@ def individual_inference(
         sims = jnp.array([value_similarity(v_self, v)[1] for v in samples["v"]])
         weights = weights.at[m].set(sims.mean())
 
+    if jnp.sum(weights) == 0:
+        return jnp.ones(len(new_obs)) / len(new_obs)
     return weights / jnp.sum(weights)

@@ -46,7 +46,8 @@ def surfaceplot(
         if "z" in ticklabels:
             ax.set_zticklabels(ticklabels["z"])
 
-    fig.savefig(f"{filename}.{format}")
+    # fig.savefig(f"{filename}.{format}")
+    plt.show()
 
 
 def plot_strategy_performance(data, weights, phis, vselfs, model_name, filename):
@@ -141,6 +142,7 @@ def make_barplots(data, plot_dir="results/tmp", filename="barplots"):
             ax=ax,
             legend=True,
         )
+        # plt.show()
         save_figure(fig, f"{plot_dir}/{filename}_known")
 
     # then make figure for unknown agents phase
@@ -163,6 +165,7 @@ def make_barplots(data, plot_dir="results/tmp", filename="barplots"):
                 legend=i == 0,
             )
         save_figure(fig, f"{plot_dir}/{filename}_unknown")
+        # plt.show()
 
 
 def barplot(data, ax, y_label=False, legend=False):

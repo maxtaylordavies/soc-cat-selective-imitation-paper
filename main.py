@@ -39,26 +39,26 @@ STRATEGY_DICT = {
 
 def run_preliminary_simulations(rng_key):
     def make_surface_plots(data, betas, filename):
-        if not os.path.exists(f"results/surfaces"):
-            os.makedirs(f"results/surfaces")
+        # if not os.path.exists(f"results/surfaces"):
+        #     os.makedirs(f"results/surfaces")
 
-        for fmt in ["svg", "pdf"]:
-            # surfaceplot(
-            #     d[d["beta"] == jnp.log10(betas[0])],
-            #     ["sim_x", "sim_y", "reward"],
-            #     ["Value similarity (x)", "Value similarity (y)", "Average reward"],
-            #     filename=f"results/{folder}/surface_{level}_sim",
-            #     format=fmt,
-            # )
-            surfaceplot(
-                data,
-                ["sim", "beta", "reward"],
-                ["Value similarity (combined)", "Decision noise", "Average reward"],
-                ticks={"y": [jnp.log10(b) for b in betas]},
-                ticklabels={"y": [str(b) for b in betas]},
-                filename=f"results/surfaces/{filename}",
-                format=fmt,
-            )
+        # for fmt in ["svg", "pdf"]:
+        #     # surfaceplot(
+        #     #     d[d["beta"] == jnp.log10(betas[0])],
+        #     #     ["sim_x", "sim_y", "reward"],
+        #     #     ["Value similarity (x)", "Value similarity (y)", "Average reward"],
+        #     #     filename=f"results/{folder}/surface_{level}_sim",
+        #     #     format=fmt,
+        #     # )
+        surfaceplot(
+            data,
+            ["sim", "beta", "reward"],
+            ["Value similarity (combined)", "Decision noise", "Average reward"],
+            ticks={"y": [jnp.log10(b) for b in betas]},
+            ticklabels={"y": [str(b) for b in betas]},
+            filename=f"results/surfaces/{filename}",
+            # format=fmt,
+        )
 
     c = 0.1
     betas = [0.01, 0.1, 1, 10, 100]
@@ -173,7 +173,7 @@ def setup():
         parser.add_argument(
             "--beta-self",
             type=float,
-            default=0.5,
+            default=5.0,
         )
         parser.add_argument(
             "--c",
@@ -220,35 +220,38 @@ def setup():
 
 rng_key, args = setup()
 
+# run_preliminary_simulations(rng_key)
+
 # load human experiment data
 sessions = load_sessions(print_breakdown=True)
+print(sessions[0]["context"])
 
-# generate_bonus_file(sessions, "bonuses.txt")
-# save_responses(sessions, f"../results/responses.txt")
+# # generate_bonus_file(sessions, "bonuses.txt")
+# # save_responses(sessions, f"../results/responses.txt")
 
-# analyse human experiment data
-sim_func = similarity_binary if args.sim_type == "binary" else similarity_continuous
-human_data = analyse_sessions(sessions, sim_func)
-make_barplots(human_data, plot_dir=args.results_dir, filename="human")
+# # analyse human experiment data
+# sim_func = similarity_binary if args.sim_type == "binary" else similarity_continuous
+# human_data = analyse_sessions(sessions, sim_func)
+# make_barplots(human_data, plot_dir=args.results_dir, filename="human")
 
 
-# compare strategies to human data
-mus = jnp.array([[0, 0.5], [1, 0.5]])
-_, _, obs_history = generate_obs_history(rng_key, mus, args)
-results = pd.DataFrame(
-    {
-        "group": [],
-        "imitation": [],
-        "agents known": [],
-        "groups relevant": [],
-        "own group label": [],
-        "strategy": [],
-    }
-)
-for name, strat in STRATEGY_DICT.items():
-    results = analyse_strategy_humanlikeness(
-        rng_key, mus, obs_history, results, strat, name, args
-    )
-results = pd.concat([results, human_data])
-results["group"] = results["group"].astype(int)
-make_barplots(results, plot_dir=args.results_dir, filename="models")
+# # compare strategies to human data
+# mus = jnp.array([[0, 0.5], [1, 0.5]])
+# _, _, obs_history = generate_obs_history(rng_key, mus, args)
+# results = pd.DataFrame(
+#     {
+#         "group": [],
+#         "imitation": [],
+#         "agents known": [],
+#         "groups relevant": [],
+#         "own group label": [],
+#         "strategy": [],
+#     }
+# )
+# for name, strat in STRATEGY_DICT.items():
+#     results = analyse_strategy_humanlikeness(
+#         rng_key, mus, obs_history, results, strat, name, args
+#     )
+# results = pd.concat([results, human_data])
+# results["group"] = results["group"].astype(int)
+# make_barplots(results, plot_dir=args.results_dir, filename="models")

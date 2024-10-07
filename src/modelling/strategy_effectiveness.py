@@ -57,6 +57,7 @@ def generate_behaviour(
     sigmas,
     num_agents,
     num_trials,
+    simulation_func=None,
     beta=0.01,
     c=0.1,
     shortcut=False,
@@ -65,7 +66,9 @@ def generate_behaviour(
     z = random.categorical(rng_key, weights, shape=(num_agents,))
     for m in tqdm(range(num_agents), desc="sampling behaviour"):
         v = random.multivariate_normal(rng_key, mus[z[m]], jnp.diag(sigmas[z[m]]))
-        if shortcut:
+        if simulation_func:
+            choices, trajs = simulation_func(rng_key, v, beta=beta, N=num_trials)
+        elif shortcut:
             choices, trajs = simulate_choices(rng_key, v, beta=beta, N=num_trials), []
         else:
             choices, trajs = simulate_trajectories(

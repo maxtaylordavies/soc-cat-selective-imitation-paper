@@ -78,6 +78,12 @@ def visualise_trajectory(traj):
     return grid
 
 
+def simulate_imitation(vself, choices):
+    vself_ = item_values(vx=float(vself[0]), vy=float(vself[1]), as_dict=False)
+    vself_ = jnp.array(vself_)
+    return jnp.mean(vself_[choices])
+
+
 def simulate_imitation_old(rng_key, vself, vm, start_locs, c=0.1, beta=0.01):
     vself_ = item_values(vx=float(vself[0]), vy=float(vself[1]))
     vm_ = item_values(vx=float(vm[0]), vy=float(vm[1]))
@@ -92,9 +98,3 @@ def simulate_imitation_old(rng_key, vself, vm, start_locs, c=0.1, beta=0.01):
         rewards[i] = traj_reward(traj, vself_, c)
 
     return np.mean(rewards)
-
-
-def simulate_imitation(vself, choices):
-    vself_ = item_values(vx=float(vself[0]), vy=float(vself[1]), as_dict=False)
-    vself_ = jnp.array(vself_)
-    return jnp.mean(vself_[choices])

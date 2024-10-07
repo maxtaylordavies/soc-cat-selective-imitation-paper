@@ -142,10 +142,10 @@ def analyse_sessions(sessions, sim_func):
                 continue
 
             # collapse counterbalancing
-            reverse = False
+            reverse = own_group_label == "mismatched"
             own_real_group = 1 - int(jnp.argmin(jnp.array(s["thetas"])) % 2)
             if s["phi"] not in {-1, own_real_group} and not agents_known:
-                reverse = True
+                reverse = not reverse
 
             tmp = analyse_trajectory_dict(d, sim_func)
 
